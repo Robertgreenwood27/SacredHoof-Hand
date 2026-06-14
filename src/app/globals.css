@@ -1,0 +1,53 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  @apply bg-ivory text-charcoal font-body antialiased;
+}
+
+h1, h2, h3, h4 {
+  @apply font-heading;
+}
+
+/* Subtle grain/texture-free, calm default link styling */
+a {
+  @apply transition-colors;
+}
+
+::selection {
+  background: #D6B56D;
+  color: #3A3A3A;
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full bg-terracotta px-7 py-3
+      text-sm font-semibold uppercase tracking-wide text-ivory shadow-sm
+      transition hover:bg-[#b87a62] focus:outline-none focus-visible:ring-2
+      focus-visible:ring-gold focus-visible:ring-offset-2 disabled:opacity-50;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-full border border-sage
+      bg-transparent px-7 py-3 text-sm font-semibold uppercase tracking-wide text-charcoal
+      transition hover:bg-sage/20 focus:outline-none focus-visible:ring-2
+      focus-visible:ring-gold focus-visible:ring-offset-2 disabled:opacity-50;
+  }
+
+  .eyebrow {
+    @apply text-xs font-semibold uppercase tracking-[0.2em] text-terracotta;
+  }
+
+  .section {
+    @apply mx-auto w-full max-w-content px-6 md:px-10;
+  }
+}
