@@ -9,5 +9,5 @@ import { env, supabaseConfigured } from "@/lib/env";
  */
 export function createClient() {
   if (!supabaseConfigured) return null;
-  return createBrowserClient(env.supabaseUrl!, env.supabaseAnonKey!);
+  return createBrowserClient(env.supabaseUrl!, env.supabasePublishableKey!);
 }

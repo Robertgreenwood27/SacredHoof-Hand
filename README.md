@@ -35,8 +35,10 @@ cp .env.local.example .env.local
 
 ### 1. Supabase — auth + data
 1. Create a project at [supabase.com](https://supabase.com).
-2. **Project Settings → API**: copy the URL, `anon` key, and `service_role` key
-   into `.env.local`.
+2. **Project Settings → API Keys**: copy the URL, the **publishable** key
+   (`sb_publishable_…`) and the **secret** key (`sb_secret_…`) into `.env.local`.
+   (Older projects' `anon` / `service_role` keys also work — the code accepts
+   either.)
 3. Open the **SQL editor** and run [`supabase/schema.sql`](supabase/schema.sql).
    This creates the tables, RLS policies, and seeds the services.
 4. **Authentication → URL Configuration**: add `http://localhost:3000/**` (and

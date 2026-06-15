@@ -13,7 +13,7 @@ export async function createSupabaseServerClient() {
   if (!supabaseConfigured) return null;
   const cookieStore = await cookies();
 
-  return createServerClient(env.supabaseUrl!, env.supabaseAnonKey!, {
+  return createServerClient(env.supabaseUrl!, env.supabasePublishableKey!, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -37,8 +37,8 @@ export async function createSupabaseServerClient() {
  * service role key isn't set.
  */
 export function createSupabaseAdminClient() {
-  if (!env.supabaseUrl || !env.supabaseServiceRoleKey) return null;
-  return createServiceClient(env.supabaseUrl, env.supabaseServiceRoleKey, {
+  if (!env.supabaseUrl || !env.supabaseSecretKey) return null;
+  return createServiceClient(env.supabaseUrl, env.supabaseSecretKey, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 }

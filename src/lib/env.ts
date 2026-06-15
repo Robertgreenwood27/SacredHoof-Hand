@@ -6,8 +6,14 @@
 
 export const env = {
   supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  // New Supabase key naming: `sb_publishable_...` for the browser/client.
+  // Falls back to the legacy `anon` key for older projects.
+  supabasePublishableKey:
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  // New `sb_secret_...` server-side key, falling back to legacy `service_role`.
+  supabaseSecretKey:
+    process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY,
 
   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
   stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
@@ -20,6 +26,8 @@ export const env = {
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 };
 
-export const supabaseConfigured = Boolean(env.supabaseUrl && env.supabaseAnonKey);
+export const supabaseConfigured = Boolean(
+  env.supabaseUrl && env.supabasePublishableKey,
+);
 export const stripeConfigured = Boolean(env.stripeSecretKey);
 export const emailConfigured = Boolean(env.resendApiKey);
