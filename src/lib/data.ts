@@ -110,11 +110,16 @@ export async function getBookedAppointments(
   return data;
 }
 
-/** Sensible default open hours so the booking calendar isn't empty pre-config. */
+/**
+ * Default open hours so the booking calendar isn't empty pre-config.
+ * Sun & Mon: all day. Tue–Sat: 5pm–midnight. ("24:00" = midnight end of day.)
+ */
 const DEFAULT_AVAILABILITY: AvailabilityRule[] = [
-  { id: "d1", day_of_week: 1, start_time: "10:00", end_time: "16:00" },
-  { id: "d2", day_of_week: 2, start_time: "10:00", end_time: "16:00" },
-  { id: "d3", day_of_week: 3, start_time: "10:00", end_time: "16:00" },
-  { id: "d4", day_of_week: 4, start_time: "10:00", end_time: "16:00" },
-  { id: "d5", day_of_week: 5, start_time: "10:00", end_time: "14:00" },
+  { id: "d0", day_of_week: 0, start_time: "00:00", end_time: "24:00" }, // Sunday
+  { id: "d1", day_of_week: 1, start_time: "00:00", end_time: "24:00" }, // Monday
+  { id: "d2", day_of_week: 2, start_time: "17:00", end_time: "24:00" }, // Tuesday
+  { id: "d3", day_of_week: 3, start_time: "17:00", end_time: "24:00" }, // Wednesday
+  { id: "d4", day_of_week: 4, start_time: "17:00", end_time: "24:00" }, // Thursday
+  { id: "d5", day_of_week: 5, start_time: "17:00", end_time: "24:00" }, // Friday
+  { id: "d6", day_of_week: 6, start_time: "17:00", end_time: "24:00" }, // Saturday
 ];
