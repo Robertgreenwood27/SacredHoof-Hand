@@ -23,7 +23,7 @@ export function Footer() {
           <p className="mb-3 font-semibold uppercase tracking-wide text-gold">Connect</p>
           <ul className="space-y-2 text-ivory/70">
             {/* Placeholders — swap for real contact details */}
-            <li><a href="mailto:hello@sacredhoofandhand.com" className="hover:text-gold">hello@sacredhoofandhand.com</a></li>
+            <li><a href="mailto:sacredhoofandhand@gmail.com" className="hover:text-gold">sacredhoofandhand@gmail.com</a></li>
             <li><span>Serving virtually &amp; locally</span></li>
           </ul>
         </div>
