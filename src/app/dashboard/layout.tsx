@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { CalendarDays, Image as ImageIcon, Clock } from "lucide-react";
 import { SignOutButton } from "@/components/SignOutButton";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { env } from "@/lib/env";
 
 const nav = [
   { href: "/dashboard", label: "Appointments", icon: CalendarDays },
@@ -14,10 +14,7 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const supabase = await createSupabaseServerClient();
-  const email = supabase
-    ? (await supabase.auth.getUser()).data.user?.email
-    : undefined;
+  const email = env.practitionerEmail;
 
   return (
     <div className="min-h-screen bg-ivory">

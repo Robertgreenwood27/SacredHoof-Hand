@@ -1,98 +1,78 @@
 "use client";
 
-import { Suspense, useState } from "react";
+import { Suspense, useActionState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Loader2, Mail } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { env } from "@/lib/env";
+import { Loader2, Lock } from "lucide-react";
+import { signIn, type SignInState } from "./actions";
 
 function LoginForm() {
   const params = useSearchParams();
   const redirect = params.get("redirect") ?? "/dashboard";
-  const [email, setEmail] = useState("");
-  const [status, setStatus] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [message, setMessage] = useState("");
-
-  async function sendLink(e: React.FormEvent) {
-    e.preventDefault();
-    const supabase = createClient();
-    if (!supabase) {
-      setStatus("error");
-      setMessage(
-        "Supabase isn't configured yet. Add your keys to .env.local to enable login.",
-      );
-      return;
-    }
-    setStatus("sending");
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${env.siteUrl}/auth/callback?redirect=${encodeURIComponent(redirect)}`,
-      },
-    });
-    if (error) {
-      setStatus("error");
-      setMessage(error.message);
-    } else {
-      setStatus("sent");
-    }
-  }
+  const [state, formAction, pending] = useActionState<SignInState, FormData>(
+    signIn,
+    {},
+  );
 
   return (
     <div className="w-full max-w-md rounded-3xl border border-sage/40 bg-white/80 p-10 shadow-sm">
       <Link href="/" className="font-heading text-2xl">
         Sacred Hoof &amp; Hand
       </Link>
-      <h1 className="mt-6 text-3xl">Practitioner login</h1>
+      <div className="mt-6 flex items-center gap-2 text-charcoal/50">
+        <Lock className="h-4 w-4" />
+        <span className="text-xs font-semibold uppercase tracking-wide">
+          Practitioner access
+        </span>
+      </div>
+      <h1 className="mt-2 text-3xl">Sign in</h1>
       <p className="mt-2 text-sm text-charcoal/60">
-        Enter your email and we&apos;ll send you a secure magic link — no password
-        needed.
+        Enter your email and password to manage sessions and content.
       </p>
 
-      {status === "sent" ? (
-        <div className="mt-8 rounded-xl bg-sage/20 p-6 text-center">
-          <Mail className="mx-auto h-8 w-8 text-sage" />
-          <p className="mt-3 font-medium">Check your inbox</p>
-          <p className="mt-1 text-sm text-charcoal/60">
-            We sent a sign-in link to <strong>{email}</strong>.
-          </p>
-        </div>
-      ) : (
-        <form onSubmit={sendLink} className="mt-8 space-y-4">
+      <form action={formAction} className="mt-8 space-y-4">
+        <input type="hidden" name="redirect" value={redirect} />
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-charcoal/80">Email</span>
           <input
             type="email"
+            name="email"
             required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
             placeholder="you@example.com"
             className="w-full rounded-xl border border-sage/50 bg-white px-4 py-3 text-sm outline-none focus:border-terracotta focus:ring-2 focus:ring-gold/40"
           />
-          <button
-            type="submit"
-            disabled={status === "sending"}
-            className="btn-primary w-full"
-          >
-            {status === "sending" ? (
-              <>
-                <Loader2 className="h-4 w-4 animate-spin" /> Sending…
-              </>
-            ) : (
-              "Send magic link"
-            )}
-          </button>
-          {status === "error" && (
-            <p className="rounded-lg bg-terracotta/15 px-3 py-2 text-sm text-terracotta">
-              {message}
-            </p>
-          )}
-        </form>
-      )}
+        </label>
+        <label className="block">
+          <span className="mb-1 block text-sm font-medium text-charcoal/80">Password</span>
+          <input
+            type="password"
+            name="password"
+            required
+            autoComplete="current-password"
+            placeholder="••••••••"
+            className="w-full rounded-xl border border-sage/50 bg-white px-4 py-3 text-sm outline-none focus:border-terracotta focus:ring-2 focus:ring-gold/40"
+          />
+        </label>
 
-      <Link
-        href="/"
-        className="mt-6 block text-center text-sm text-charcoal/50 underline"
-      >
+        <button type="submit" disabled={pending} className="btn-primary w-full">
+          {pending ? (
+            <>
+              <Loader2 className="h-4 w-4 animate-spin" /> Signing in…
+            </>
+          ) : (
+            "Sign in"
+          )}
+        </button>
+
+        {state.error && (
+          <p className="rounded-lg bg-terracotta/15 px-3 py-2 text-sm text-terracotta">
+            {state.error}
+          </p>
+        )}
+      </form>
+
+      <Link href="/" className="mt-6 block text-center text-sm text-charcoal/50 underline">
         ← Back home
       </Link>
     </div>

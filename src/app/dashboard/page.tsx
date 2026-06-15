@@ -1,6 +1,6 @@
 import { isAfter } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { setAppointmentStatus } from "./actions";
 import { formatPrice, BUSINESS_TIMEZONE } from "@/lib/content";
 import type { Appointment } from "@/lib/types";
@@ -16,7 +16,7 @@ const statusStyles: Record<string, string> = {
 };
 
 export default async function AppointmentsPage() {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
 
   if (!supabase) {
     return (

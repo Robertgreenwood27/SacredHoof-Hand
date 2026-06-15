@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Settings } from "lucide-react";
 
 export function Footer() {
   return (
@@ -16,7 +17,6 @@ export function Footer() {
             <li><Link href="/#services" className="hover:text-gold">Sessions</Link></li>
             <li><Link href="/#vision" className="hover:text-gold">The vision</Link></li>
             <li><Link href="/book" className="hover:text-gold">Book a session</Link></li>
-            <li><Link href="/login" className="hover:text-gold">Practitioner login</Link></li>
           </ul>
         </div>
         <div className="text-sm">
@@ -28,8 +28,16 @@ export function Footer() {
           </ul>
         </div>
       </div>
-      <div className="section mt-10 border-t border-ivory/10 pt-6 text-xs text-ivory/40">
-        © {new Date().getFullYear()} Sacred Hoof &amp; Hand. All rights reserved.
+      <div className="section mt-10 flex items-center justify-between border-t border-ivory/10 pt-6 text-xs text-ivory/40">
+        <span>© {new Date().getFullYear()} Sacred Hoof &amp; Hand. All rights reserved.</span>
+        <Link
+          href="/login"
+          aria-label="Practitioner sign in"
+          title="Practitioner sign in"
+          className="text-ivory/20 transition hover:text-gold"
+        >
+          <Settings className="h-4 w-4" />
+        </Link>
       </div>
     </footer>
   );

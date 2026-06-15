@@ -1,21 +1,28 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/server";
+import { requireDashboardSession } from "@/lib/auth-server";
 import type { AppointmentStatus } from "@/lib/types";
 
-async function requireClient() {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) throw new Error("Supabase not configured.");
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) throw new Error("Not authenticated.");
+/**
+ * Guard + privileged client. Access is protected by the dashboard session
+ * (middleware + this check), so writes go through the service/secret key which
+ * bypasses Row Level Security.
+ */
+async function requireAdmin() {
+  await requireDashboardSession();
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    throw new Error(
+      "Supabase isn't fully configured (missing URL or secret key).",
+    );
+  }
   return supabase;
 }
 
 export async function updateHero(formData: FormData) {
-  const supabase = await requireClient();
+  const supabase = await requireAdmin();
   const payload = {
     id: 1,
     hero_eyebrow: String(formData.get("eyebrow") ?? ""),
@@ -33,7 +40,7 @@ export async function updateHero(formData: FormData) {
 }
 
 export async function setAppointmentStatus(id: string, status: AppointmentStatus) {
-  const supabase = await requireClient();
+  const supabase = await requireAdmin();
   const { error } = await supabase
     .from("appointments")
     .update({ status })
@@ -43,7 +50,7 @@ export async function setAppointmentStatus(id: string, status: AppointmentStatus
 }
 
 export async function addAvailabilityRule(formData: FormData) {
-  const supabase = await requireClient();
+  const supabase = await requireAdmin();
   const { error } = await supabase.from("availability_rules").insert({
     day_of_week: Number(formData.get("day_of_week")),
     start_time: String(formData.get("start_time")),
@@ -54,7 +61,7 @@ export async function addAvailabilityRule(formData: FormData) {
 }
 
 export async function deleteAvailabilityRule(id: string) {
-  const supabase = await requireClient();
+  const supabase = await requireAdmin();
   const { error } = await supabase.from("availability_rules").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/availability");

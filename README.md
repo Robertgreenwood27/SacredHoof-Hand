@@ -5,7 +5,7 @@ online payment, automated confirmation emails, and a dashboard where the
 practitioner can edit the hero section and manage appointments.
 
 **Stack:** Next.js 15 (App Router, TypeScript) · Tailwind CSS · Supabase
-(magic-link auth + Postgres) · Stripe Checkout · Resend (email).
+(Postgres) · Stripe Checkout · Resend (email) · password-gated dashboard.
 
 > The whole app **runs and is fully clickable with zero configuration** — every
 > integration degrades gracefully and uses placeholders until you add real keys.
@@ -33,7 +33,7 @@ cp .env.local.example .env.local
 
 ## Setup checklist (when you're ready to go live)
 
-### 1. Supabase — auth + data
+### 1. Supabase — data
 1. Create a project at [supabase.com](https://supabase.com).
 2. **Project Settings → API Keys**: copy the URL, the **publishable** key
    (`sb_publishable_…`) and the **secret** key (`sb_secret_…`) into `.env.local`.
@@ -41,10 +41,14 @@ cp .env.local.example .env.local
    either.)
 3. Open the **SQL editor** and run [`supabase/schema.sql`](supabase/schema.sql).
    This creates the tables, RLS policies, and seeds the services.
-4. **Authentication → URL Configuration**: add `http://localhost:3000/**` (and
-   your production URL) to the redirect allow-list so magic links work.
-5. Create the practitioner's account: easiest is to log in once via the
-   `/login` page — the magic link creates the user automatically.
+
+### 1b. Dashboard login
+The dashboard uses a simple single-practitioner login (no Supabase Auth needed).
+Set `PRACTITIONER_EMAIL` and `DASHBOARD_PASSWORD` in `.env.local`, then sign in
+at `/login` — reachable via the faint gear icon in the site footer. The session
+is a signed, httpOnly cookie; `/dashboard` is guarded by middleware. All
+dashboard reads/writes use the Supabase **secret** key server-side, so the
+secret key must be set for the dashboard to load and save data.
 
 ### 2. Stripe — payments
 1. Grab test keys from **Developers → API keys** → `.env.local`.
@@ -78,7 +82,7 @@ Visitor → /book → picks service + time + details
   the practitioner's weekly availability minus already-booked times.
 - **Hero content** lives in the `site_content` table and is edited at
   `/dashboard/hero`; the homepage reads it live.
-- **Dashboard** (`/dashboard`) is protected by middleware — magic-link login required.
+- **Dashboard** (`/dashboard`) is protected by middleware — password login required.
 
 ## Project map
 
@@ -86,7 +90,7 @@ Visitor → /book → picks service + time + details
 |------|------------|
 | `src/app/page.tsx` | Landing page (hero, services, vision, CTA) |
 | `src/app/book/` | Booking flow + success page |
-| `src/app/login/` | Magic-link login |
+| `src/app/login/` | Practitioner password login |
 | `src/app/dashboard/` | Appointments, hero editor, availability |
 | `src/app/api/checkout/` | Creates Stripe Checkout session (+ dev fallback) |
 | `src/app/api/webhooks/stripe/` | Confirms payment → books + emails |

@@ -23,6 +23,9 @@ export const env = {
   emailFrom: process.env.EMAIL_FROM ?? "Sacred Hoof & Hand <onboarding@resend.dev>",
   practitionerEmail: process.env.PRACTITIONER_EMAIL ?? "practitioner@example.com",
 
+  // Dashboard login (single practitioner). Email is PRACTITIONER_EMAIL above.
+  dashboardPassword: process.env.DASHBOARD_PASSWORD,
+
   siteUrl: process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000",
 };
 

@@ -23,9 +23,6 @@ export function Navbar() {
           >
             Book
           </Link>
-          <Link href="/login" className="hover:text-gold">
-            Login
-          </Link>
         </div>
       </nav>
     </header>
