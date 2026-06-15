@@ -1,6 +1,15 @@
 import type { HeroContent, Service } from "./types";
 
 /**
+ * The practitioner's timezone. ALL availability hours and displayed booking
+ * times are anchored to this, so every client sees the correct times no matter
+ * where they (or the server) are located. Change this if she relocates.
+ */
+export const BUSINESS_TIMEZONE = "America/Denver"; // Mountain Time
+/** Short label shown next to times in the UI. */
+export const BUSINESS_TZ_LABEL = "Mountain Time";
+
+/**
  * Default content shipped with the site. The hero is overridable from the
  * dashboard (stored in Supabase `site_content`); these values are the fallback
  * shown before anything is customized or if Supabase isn't configured yet.

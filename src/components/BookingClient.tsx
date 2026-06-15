@@ -1,32 +1,39 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { format } from "date-fns";
+import { useEffect, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
-import { priceLabel } from "@/lib/content";
-import { groupSlotsByDay } from "@/lib/scheduling";
-import type { Service, TimeSlot } from "@/lib/types";
+import { priceLabel, BUSINESS_TZ_LABEL } from "@/lib/content";
+import type { DayGrid, GridSlot } from "@/lib/scheduling";
+import type { Service } from "@/lib/types";
 
 type Props = {
   services: Service[];
-  slotsByService: Record<string, TimeSlot[]>;
+  gridByService: Record<string, DayGrid[]>;
   preselectServiceId?: string;
 };
 
-export function BookingClient({ services, slotsByService, preselectServiceId }: Props) {
+export function BookingClient({ services, gridByService, preselectServiceId }: Props) {
   const initial =
     services.find((s) => s.id === preselectServiceId) ?? services[0];
   const [serviceId, setServiceId] = useState(initial?.id);
-  const [slot, setSlot] = useState<TimeSlot | null>(null);
+  const [dateKey, setDateKey] = useState<string | undefined>(undefined);
+  const [slot, setSlot] = useState<GridSlot | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const service = services.find((s) => s.id === serviceId) ?? services[0];
   const isFree = service?.priceCents === 0;
-  const slots = slotsByService[serviceId ?? ""] ?? [];
-  const grouped = useMemo(() => groupSlotsByDay(slots), [slots]);
-  const days = Object.keys(grouped);
+  const grid = gridByService[serviceId ?? ""] ?? [];
+  const selectedDay = grid.find((d) => d.dateKey === dateKey);
+
+  // When the service changes, reset to its first day with open times.
+  useEffect(() => {
+    const firstAvailable = grid.find((d) => d.hasAvailable) ?? grid[0];
+    setDateKey(firstAvailable?.dateKey);
+    setSlot(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serviceId]);
 
   async function handleSubmit() {
     if (!service || !slot) return;
@@ -46,7 +53,7 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Something went wrong.");
       if (data.url) {
-        window.location.href = data.url; // Stripe Checkout
+        window.location.href = data.url; // Stripe Checkout (or free/dev success)
       } else {
         throw new Error("No checkout URL returned.");
       }
@@ -57,6 +64,7 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
   }
 
   const canSubmit = service && slot && form.name && form.email && !submitting;
+  const anyAvailability = grid.some((d) => d.hasAvailable);
 
   return (
     <div className="section grid gap-10 py-16 lg:grid-cols-[1.4fr_1fr]">
@@ -68,10 +76,7 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
             {services.map((s) => (
               <button
                 key={s.id}
-                onClick={() => {
-                  setServiceId(s.id);
-                  setSlot(null);
-                }}
+                onClick={() => setServiceId(s.id)}
                 className={`rounded-2xl border p-5 text-left transition ${
                   s.id === serviceId
                     ? "border-terracotta bg-terracotta/10 ring-1 ring-terracotta"
@@ -92,40 +97,80 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
 
         {/* Step 2: pick a time */}
         <section>
-          <h2 className="mb-4 text-2xl">2 · Pick a time</h2>
-          {days.length === 0 ? (
+          <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-2xl">2 · Pick a time</h2>
+            <span className="text-xs font-medium uppercase tracking-wide text-charcoal/50">
+              All times in {BUSINESS_TZ_LABEL}
+            </span>
+          </div>
+
+          {!anyAvailability ? (
             <p className="rounded-xl border border-sage/40 bg-white/60 p-5 text-sm text-charcoal/60">
               No open times in the next few weeks. Please check back soon or reach
               out directly.
             </p>
           ) : (
-            <div className="space-y-5">
-              {days.map((day) => (
-                <div key={day}>
-                  <p className="mb-2 text-sm font-semibold text-charcoal/70">
-                    {format(new Date(day + "T00:00:00"), "EEEE, MMMM d")}
+            <>
+              {/* Day selector */}
+              <div className="-mx-1 mb-5 flex gap-2 overflow-x-auto px-1 pb-2">
+                {grid.map((day) => {
+                  const active = day.dateKey === dateKey;
+                  return (
+                    <button
+                      key={day.dateKey}
+                      onClick={() => {
+                        setDateKey(day.dateKey);
+                        setSlot(null);
+                      }}
+                      disabled={!day.hasAvailable}
+                      className={`shrink-0 rounded-xl border px-4 py-2 text-center text-sm transition ${
+                        active
+                          ? "border-terracotta bg-terracotta text-ivory"
+                          : day.hasAvailable
+                            ? "border-sage/50 bg-white/70 hover:border-terracotta"
+                            : "cursor-not-allowed border-sage/20 bg-transparent text-charcoal/30"
+                      }`}
+                    >
+                      {day.shortLabel}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Time grid for the selected day */}
+              {selectedDay && (
+                <div>
+                  <p className="mb-3 text-sm font-semibold text-charcoal/70">
+                    {selectedDay.dayLabel}
                   </p>
-                  <div className="flex flex-wrap gap-2">
-                    {grouped[day].map((s) => {
+                  <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
+                    {selectedDay.slots.map((s) => {
                       const active = slot?.startsAt === s.startsAt;
                       return (
                         <button
                           key={s.startsAt}
-                          onClick={() => setSlot(s)}
-                          className={`rounded-full border px-4 py-2 text-sm transition ${
+                          onClick={() => s.available && setSlot(s)}
+                          disabled={!s.available}
+                          title={s.available ? undefined : "Unavailable"}
+                          className={`rounded-lg border px-2 py-2 text-sm transition ${
                             active
                               ? "border-terracotta bg-terracotta text-ivory"
-                              : "border-sage/50 bg-white/70 hover:border-terracotta"
+                              : s.available
+                                ? "border-sage/50 bg-white/80 hover:border-terracotta hover:bg-terracotta/5"
+                                : "cursor-not-allowed border-transparent bg-sage/10 text-charcoal/30 line-through"
                           }`}
                         >
-                          {format(new Date(s.startsAt), "h:mm a")}
+                          {s.label}
                         </button>
                       );
                     })}
                   </div>
+                  <p className="mt-3 text-xs text-charcoal/40">
+                    Greyed-out times are unavailable or already booked.
+                  </p>
                 </div>
-              ))}
-            </div>
+              )}
+            </>
           )}
         </section>
 
@@ -179,7 +224,11 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
             <Row label="Duration" value={service ? `${service.durationMinutes} min` : "—"} />
             <Row
               label="Time"
-              value={slot ? format(new Date(slot.startsAt), "EEE MMM d · h:mm a") : "Select a time"}
+              value={
+                slot && selectedDay
+                  ? `${selectedDay.dayLabel} · ${slot.label}`
+                  : "Select a time"
+              }
             />
             <div className="border-t border-sage/30 pt-3">
               <Row
@@ -265,9 +314,15 @@ function Row({
   emphasize?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between">
-      <dt className="text-charcoal/60">{label}</dt>
-      <dd className={emphasize ? "font-heading text-2xl text-terracotta" : "text-charcoal"}>
+    <div className="flex items-center justify-between gap-3">
+      <dt className="shrink-0 text-charcoal/60">{label}</dt>
+      <dd
+        className={
+          emphasize
+            ? "font-heading text-2xl text-terracotta"
+            : "text-right text-charcoal"
+        }
+      >
         {value}
       </dd>
     </div>

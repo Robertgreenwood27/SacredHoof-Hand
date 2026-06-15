@@ -3,7 +3,8 @@ import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { BookingClient } from "@/components/BookingClient";
 import { getServices, getAvailabilityRules, getBookedAppointments } from "@/lib/data";
-import { generateSlots } from "@/lib/scheduling";
+import { generateDayGrid } from "@/lib/scheduling";
+import { BUSINESS_TIMEZONE } from "@/lib/content";
 import { addDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -25,11 +26,16 @@ export default async function BookPage({
     addDays(now, 30).toISOString(),
   );
 
-  // Pre-compute slots per service duration so the client can switch instantly.
-  const slotsByService = Object.fromEntries(
+  // Pre-compute the time grid per service duration so switching is instant.
+  const gridByService = Object.fromEntries(
     services.map((s) => [
       s.id,
-      generateSlots({ rules, booked, durationMinutes: s.durationMinutes }),
+      generateDayGrid({
+        rules,
+        booked,
+        durationMinutes: s.durationMinutes,
+        timeZone: BUSINESS_TIMEZONE,
+      }),
     ]),
   );
 
@@ -52,7 +58,7 @@ export default async function BookPage({
 
       <BookingClient
         services={services}
-        slotsByService={slotsByService}
+        gridByService={gridByService}
         preselectServiceId={preselect}
       />
 

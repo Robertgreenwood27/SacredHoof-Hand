@@ -1,7 +1,7 @@
 import { Resend } from "resend";
-import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { env, emailConfigured } from "./env";
-import { formatPrice } from "./content";
+import { formatPrice, BUSINESS_TIMEZONE, BUSINESS_TZ_LABEL } from "./content";
 import type { Appointment } from "./types";
 
 const resend = emailConfigured ? new Resend(env.resendApiKey) : null;
@@ -18,9 +18,11 @@ type BookingEmailInput = Pick<
 >;
 
 function when(appt: BookingEmailInput) {
-  const start = new Date(appt.starts_at);
-  const end = new Date(appt.ends_at);
-  return `${format(start, "EEEE, MMMM d, yyyy")} · ${format(start, "h:mm a")} – ${format(end, "h:mm a")}`;
+  const tz = BUSINESS_TIMEZONE;
+  const day = formatInTimeZone(appt.starts_at, tz, "EEEE, MMMM d, yyyy");
+  const start = formatInTimeZone(appt.starts_at, tz, "h:mm a");
+  const end = formatInTimeZone(appt.ends_at, tz, "h:mm a");
+  return `${day} · ${start} – ${end} (${BUSINESS_TZ_LABEL})`;
 }
 
 const wrap = (inner: string) => `

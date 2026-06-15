@@ -1,7 +1,8 @@
-import { format, isAfter } from "date-fns";
+import { isAfter } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { setAppointmentStatus } from "./actions";
-import { formatPrice } from "@/lib/content";
+import { formatPrice, BUSINESS_TIMEZONE } from "@/lib/content";
 import type { Appointment } from "@/lib/types";
 import { SetupNotice } from "@/components/dashboard/SetupNotice";
 
@@ -94,8 +95,8 @@ function Row({ appt }: { appt: Appointment }) {
         </div>
         <p className="text-sm text-charcoal/70">{appt.service_name}</p>
         <p className="text-sm text-charcoal/50">
-          {format(new Date(appt.starts_at), "EEE MMM d, yyyy · h:mm a")} ·{" "}
-          {appt.client_email}
+          {formatInTimeZone(appt.starts_at, BUSINESS_TIMEZONE, "EEE MMM d, yyyy · h:mm a")}{" "}
+          · {appt.client_email}
         </p>
         {appt.notes && (
           <p className="mt-1 text-sm italic text-charcoal/50">“{appt.notes}”</p>
