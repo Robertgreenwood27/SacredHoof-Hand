@@ -79,25 +79,35 @@ alter table public.availability_rules enable row level security;
 alter table public.appointments       enable row level security;
 
 -- Public read
+-- (drop-then-create so this whole file is safe to re-run)
+drop policy if exists "public read content" on public.site_content;
 create policy "public read content" on public.site_content
   for select using (true);
+drop policy if exists "public read services" on public.services;
 create policy "public read services" on public.services
   for select using (true);
+drop policy if exists "public read availability" on public.availability_rules;
 create policy "public read availability" on public.availability_rules
   for select using (true);
 
 -- Authenticated full management
+drop policy if exists "auth manage content" on public.site_content;
 create policy "auth manage content" on public.site_content
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "auth manage services" on public.services;
 create policy "auth manage services" on public.services
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "auth manage availability" on public.availability_rules;
 create policy "auth manage availability" on public.availability_rules
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
--- Appointments: authenticated practitioner can read & manage. Inserts happen
--- via the service-role key in the webhook (bypasses RLS).
+-- Appointments: dashboard reads/writes use the Supabase secret key, which
+-- bypasses RLS. These policies are kept for completeness (e.g. if you ever use
+-- Supabase Auth directly).
+drop policy if exists "auth read appointments" on public.appointments;
 create policy "auth read appointments" on public.appointments
   for select using (auth.role() = 'authenticated');
+drop policy if exists "auth update appointments" on public.appointments;
 create policy "auth update appointments" on public.appointments
   for update using (auth.role() = 'authenticated');
 
