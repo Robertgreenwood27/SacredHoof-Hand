@@ -1,5 +1,8 @@
 import "server-only";
-import { createSupabaseServerClient } from "./supabase/server";
+import {
+  createSupabaseServerClient,
+  createSupabaseAdminClient,
+} from "./supabase/server";
 import {
   DEFAULT_HERO,
   DEFAULT_SERVICES,
@@ -91,12 +94,17 @@ export async function getAvailabilityRules(): Promise<AvailabilityRule[]> {
   return data;
 }
 
-/** Booked (non-cancelled) appointments within a window, for slot conflicts. */
+/**
+ * Booked (non-cancelled) appointments within a window, for slot conflicts.
+ * Uses the secret/admin client because RLS keeps the appointments table private
+ * — only the times are returned here, never client details, and this runs
+ * server-side so the secret key never reaches the browser.
+ */
 export async function getBookedAppointments(
   fromIso: string,
   toIso: string,
 ): Promise<Pick<Appointment, "starts_at" | "ends_at">[]> {
-  const supabase = await createSupabaseServerClient();
+  const supabase = createSupabaseAdminClient();
   if (!supabase) return [];
 
   const { data, error } = await supabase

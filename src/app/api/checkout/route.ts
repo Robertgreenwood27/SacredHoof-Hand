@@ -33,6 +33,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unknown service." }, { status: 404 });
   }
 
+  // Return to whatever origin the booking came from (e.g. the live domain),
+  // falling back to the configured site URL. Avoids hard-coding localhost.
+  const baseUrl = req.headers.get("origin") ?? env.siteUrl;
+
   const metadata = {
     service_id: service.id,
     service_name: service.name,
@@ -60,7 +64,7 @@ export async function POST(req: Request) {
       );
     }
     await createConfirmedAppointment(metadata, null);
-    return NextResponse.json({ url: `${env.siteUrl}/book/success?free=1` });
+    return NextResponse.json({ url: `${baseUrl}/book/success?free=1` });
   }
 
   // --- Dev fallback: no Stripe configured yet -------------------------------
@@ -68,7 +72,7 @@ export async function POST(req: Request) {
   if (!stripeConfigured || !stripe) {
     await createConfirmedAppointment(metadata, null);
     return NextResponse.json({
-      url: `${env.siteUrl}/book/success?dev=1`,
+      url: `${baseUrl}/book/success?dev=1`,
     });
   }
 
@@ -90,8 +94,8 @@ export async function POST(req: Request) {
       },
     ],
     metadata,
-    success_url: `${env.siteUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
-    cancel_url: `${env.siteUrl}/book?service=${service.id}`,
+    success_url: `${baseUrl}/book/success?session_id={CHECKOUT_SESSION_ID}`,
+    cancel_url: `${baseUrl}/book?service=${service.id}`,
   });
 
   return NextResponse.json({ url: session.url });
