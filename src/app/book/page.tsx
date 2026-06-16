@@ -4,7 +4,7 @@ import { Footer } from "@/components/Footer";
 import { BookingClient } from "@/components/BookingClient";
 import { getServices, getAvailabilityRules, getBookedAppointments } from "@/lib/data";
 import { generateDayGrid } from "@/lib/scheduling";
-import { BUSINESS_TIMEZONE } from "@/lib/content";
+import { BUSINESS_TIMEZONE, BOOKING_LEAD_HOURS } from "@/lib/content";
 import { addDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -35,6 +35,7 @@ export default async function BookPage({
         booked,
         durationMinutes: s.durationMinutes,
         timeZone: BUSINESS_TIMEZONE,
+        leadHours: BOOKING_LEAD_HOURS,
       }),
     ]),
   );

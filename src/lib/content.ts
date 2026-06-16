@@ -10,6 +10,13 @@ export const BUSINESS_TIMEZONE = "America/Denver"; // Mountain Time
 export const BUSINESS_TZ_LABEL = "Mountain Time";
 
 /**
+ * Minimum notice before a session can be booked, in hours. Slots starting
+ * sooner than this are hidden. Set to 2 so same-day booking works while still
+ * giving a little lead time — set to 0 to allow booking right up to the slot.
+ */
+export const BOOKING_LEAD_HOURS = 2;
+
+/**
  * Default content shipped with the site. The hero is overridable from the
  * dashboard (stored in Supabase `site_content`); these values are the fallback
  * shown before anything is customized or if Supabase isn't configured yet.
