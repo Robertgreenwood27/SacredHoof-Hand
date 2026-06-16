@@ -108,18 +108,30 @@ export async function sendBookingEmails(appt: BookingEmailInput) {
     return;
   }
 
-  await Promise.all([
+  const [clientRes, practitionerRes] = await Promise.all([
+    // Client confirmation — replies go to the practitioner.
     resend.emails.send({
       from: env.emailFrom,
       to: appt.client_email,
+      replyTo: env.practitionerEmail,
       subject: subjectClient,
       html: clientHtml,
     }),
+    // Practitioner notification — replies go straight to the client.
     resend.emails.send({
       from: env.emailFrom,
       to: env.practitionerEmail,
+      replyTo: appt.client_email,
       subject: subjectPractitioner,
       html: practitionerHtml,
     }),
   ]);
+
+  // Resend returns errors in the payload rather than throwing — surface them.
+  if (clientRes.error) {
+    console.error("[email] client confirmation failed:", clientRes.error);
+  }
+  if (practitionerRes.error) {
+    console.error("[email] practitioner notification failed:", practitionerRes.error);
+  }
 }

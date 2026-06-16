@@ -117,14 +117,13 @@ export const FUTURE_OFFERINGS = [
 
 /**
  * Aftercare guidance included in the client's confirmation email. Edit the
- * wording here freely — it's her copy. ("feelings" was "feels" in the original
- * note; corrected as an obvious typo.)
+ * wording here freely — it's her copy.
  */
 export const AFTERCARE = {
   heading: "Caring for yourself after your session",
   body:
     "Reiki can start a cleansing process that affects the physical body as well " +
-    "as the mind and emotions. Stored toxins may be released along with feelings " +
+    "as the mind and emotions. Stored toxins may be released along with feels " +
     "and thought patterns that are no longer useful. Physical experiences to be " +
     "aware of include a headache, stomachache, weakness, or aches and pains. " +
     "These are effects of toxins being drawn out from stored areas in the body.",
