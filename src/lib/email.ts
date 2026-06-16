@@ -1,7 +1,12 @@
 import { Resend } from "resend";
 import { formatInTimeZone } from "date-fns-tz";
 import { env, emailConfigured } from "./env";
-import { formatPrice, BUSINESS_TIMEZONE, BUSINESS_TZ_LABEL } from "./content";
+import {
+  priceLabel,
+  AFTERCARE,
+  BUSINESS_TIMEZONE,
+  BUSINESS_TZ_LABEL,
+} from "./content";
 import type { Appointment } from "./types";
 
 const resend = emailConfigured ? new Resend(env.resendApiKey) : null;
@@ -41,36 +46,59 @@ const wrap = (inner: string) => `
   </div>
 `;
 
-/**
- * Sends booking confirmations to both the client and the practitioner.
- * No-ops (logs only) when email isn't configured yet.
- */
-export async function sendBookingEmails(appt: BookingEmailInput) {
+/** Builds the rendered subjects + HTML for both emails (no sending). */
+export function buildBookingEmails(appt: BookingEmailInput) {
   const subjectClient = `Your Reiki session is confirmed — ${when(appt)}`;
   const subjectPractitioner = `New booking: ${appt.client_name} — ${appt.service_name}`;
+
+  const supportsList = AFTERCARE.supports
+    .map(
+      (item) =>
+        `<li style="margin:2px 0; padding-left:18px; position:relative;"><span style="position:absolute; left:0; color:#C98C73;">&bull;</span>${item}</li>`,
+    )
+    .join("");
 
   const clientHtml = wrap(`
     <p>Hi ${appt.client_name},</p>
     <p>Your session is confirmed. Here are the details:</p>
     <table style="width:100%; border-collapse:collapse; margin:16px 0;">
-      <tr><td style="padding:6px 0; color:#8a857c;">Service</td><td style="padding:6px 0;">${appt.service_name}</td></tr>
-      <tr><td style="padding:6px 0; color:#8a857c;">When</td><td style="padding:6px 0;">${when(appt)}</td></tr>
-      <tr><td style="padding:6px 0; color:#8a857c;">Paid</td><td style="padding:6px 0;">${formatPrice(appt.amount_cents)}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Service</td><td style="padding:6px 0;">${appt.service_name}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">When</td><td style="padding:6px 0;">${when(appt)}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Paid</td><td style="padding:6px 0;">${priceLabel(appt.amount_cents)}</td></tr>
     </table>
     <p>Take a few moments before our time together to settle in and set an intention. I look forward to holding space for you.</p>
+
+    <div style="margin:24px 0; padding:20px 22px; background:#F7F3EC; border-left:3px solid #D6B56D; border-radius:8px;">
+      <p style="margin:0 0 8px; font-family:Georgia,serif; font-size:17px; color:#3A3A3A;">${AFTERCARE.heading}</p>
+      <p style="margin:0 0 12px; color:#5c5850; font-size:14px; line-height:1.6;">${AFTERCARE.body}</p>
+      <p style="margin:0 0 6px; color:#5c5850; font-size:14px;">${AFTERCARE.supportsIntro}</p>
+      <ul style="margin:0; padding:0; list-style:none; color:#3A3A3A; font-size:14px;">${supportsList}</ul>
+    </div>
+
     <p>With warmth,<br/>Sacred Hoof &amp; Hand</p>
   `);
 
   const practitionerHtml = wrap(`
     <p>You have a new booking.</p>
     <table style="width:100%; border-collapse:collapse; margin:16px 0;">
-      <tr><td style="padding:6px 0; color:#8a857c;">Client</td><td style="padding:6px 0;">${appt.client_name} (${appt.client_email})</td></tr>
-      <tr><td style="padding:6px 0; color:#8a857c;">Service</td><td style="padding:6px 0;">${appt.service_name}</td></tr>
-      <tr><td style="padding:6px 0; color:#8a857c;">When</td><td style="padding:6px 0;">${when(appt)}</td></tr>
-      <tr><td style="padding:6px 0; color:#8a857c;">Paid</td><td style="padding:6px 0;">${formatPrice(appt.amount_cents)}</td></tr>
-      ${appt.notes ? `<tr><td style="padding:6px 0; color:#8a857c;">Notes</td><td style="padding:6px 0;">${appt.notes}</td></tr>` : ""}
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Client</td><td style="padding:6px 0;">${appt.client_name} (${appt.client_email})</td></tr>
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Service</td><td style="padding:6px 0;">${appt.service_name}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">When</td><td style="padding:6px 0;">${when(appt)}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Paid</td><td style="padding:6px 0;">${priceLabel(appt.amount_cents)}</td></tr>
+      ${appt.notes ? `<tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Notes</td><td style="padding:6px 0;">${appt.notes}</td></tr>` : ""}
     </table>
   `);
+
+  return { subjectClient, subjectPractitioner, clientHtml, practitionerHtml };
+}
+
+/**
+ * Sends booking confirmations to both the client and the practitioner.
+ * No-ops (logs only) when email isn't configured yet.
+ */
+export async function sendBookingEmails(appt: BookingEmailInput) {
+  const { subjectClient, subjectPractitioner, clientHtml, practitionerHtml } =
+    buildBookingEmails(appt);
 
   if (!resend) {
     console.warn(
