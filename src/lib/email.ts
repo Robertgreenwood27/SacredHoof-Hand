@@ -32,20 +32,28 @@ function when(appt: BookingEmailInput, tz: string) {
 }
 
 const wrap = (inner: string) => `
-  <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; background:#F7F3EC; padding:32px;">
+  <div style="font-family: -apple-system, Helvetica, Arial, sans-serif; background:#F7F3EC; padding:16px;">
     <div style="max-width:560px; margin:0 auto; background:#fff; border-radius:16px; overflow:hidden; border:1px solid #e7e1d6;">
-      <div style="background:#A8B2A1; padding:24px 32px;">
+      <div style="background:#A8B2A1; padding:20px 24px;">
         <h1 style="margin:0; font-family:Georgia,serif; font-size:22px; color:#3A3A3A;">Sacred Hoof &amp; Hand</h1>
       </div>
-      <div style="padding:32px; color:#3A3A3A; font-size:15px; line-height:1.6;">
+      <div style="padding:24px; color:#3A3A3A; font-size:15px; line-height:1.6;">
         ${inner}
       </div>
-      <div style="padding:20px 32px; background:#F7F3EC; color:#8a857c; font-size:12px;">
+      <div style="padding:16px 24px; background:#F7F3EC; color:#8a857c; font-size:12px;">
         Healing through Reiki, presence, and compassionate connection.
       </div>
     </div>
   </div>
 `;
+
+// Detail-table row. Value cells wrap (long emails have no spaces, so without
+// this they overflow and clip the right side of the table on narrow screens).
+const row = (label: string, value: string) =>
+  `<tr>
+    <td style="width:68px; padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">${label}</td>
+    <td style="padding:6px 0; word-break:break-word; overflow-wrap:anywhere;">${value}</td>
+  </tr>`;
 
 /** Builds the rendered subjects + HTML for both emails (no sending). */
 export function buildBookingEmails(appt: BookingEmailInput) {
@@ -68,10 +76,10 @@ export function buildBookingEmails(appt: BookingEmailInput) {
   const clientHtml = wrap(`
     <p>Hi ${appt.client_name},</p>
     <p>Your session is confirmed. Here are the details:</p>
-    <table style="width:100%; border-collapse:collapse; margin:16px 0;">
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Service</td><td style="padding:6px 0;">${appt.service_name}</td></tr>
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">When</td><td style="padding:6px 0;">${whenClient}</td></tr>
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Paid</td><td style="padding:6px 0;">${priceLabel(appt.amount_cents)}</td></tr>
+    <table style="width:100%; border-collapse:collapse; margin:16px 0; table-layout:fixed;">
+      ${row("Service", appt.service_name)}
+      ${row("When", whenClient)}
+      ${row("Paid", priceLabel(appt.amount_cents))}
     </table>
     <p>Take a few moments before our time together to settle in and set an intention. I look forward to holding space for you.</p>
 
@@ -87,12 +95,12 @@ export function buildBookingEmails(appt: BookingEmailInput) {
 
   const practitionerHtml = wrap(`
     <p>You have a new booking.</p>
-    <table style="width:100%; border-collapse:collapse; margin:16px 0;">
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Client</td><td style="padding:6px 0;">${appt.client_name} (${appt.client_email})</td></tr>
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Service</td><td style="padding:6px 0;">${appt.service_name}</td></tr>
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">When</td><td style="padding:6px 0;">${whenPractitioner}</td></tr>
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Paid</td><td style="padding:6px 0;">${priceLabel(appt.amount_cents)}</td></tr>
-      ${appt.notes ? `<tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Notes</td><td style="padding:6px 0;">${appt.notes}</td></tr>` : ""}
+    <table style="width:100%; border-collapse:collapse; margin:16px 0; table-layout:fixed;">
+      ${row("Client", `${appt.client_name}<br/><a href="mailto:${appt.client_email}" style="color:#C98C73;">${appt.client_email}</a>`)}
+      ${row("Service", appt.service_name)}
+      ${row("When", whenPractitioner)}
+      ${row("Paid", priceLabel(appt.amount_cents))}
+      ${appt.notes ? row("Notes", appt.notes) : ""}
     </table>
   `);
 
