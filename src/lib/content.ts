@@ -1,12 +1,14 @@
 import type { HeroContent, Service } from "./types";
 
 /**
- * The practitioner's timezone. ALL availability hours and displayed booking
- * times are anchored to this, so every client sees the correct times no matter
- * where they (or the server) are located. Change this if she relocates.
+ * The practitioner's timezone. Availability hours are AUTHORED in this zone and
+ * each slot is stored as a timezone-neutral UTC instant. Clients see times
+ * converted to their OWN browser timezone (scheduler + their confirmation
+ * email); the practitioner's view (dashboard + her notification email) stays in
+ * this zone. Change this if she relocates.
  */
 export const BUSINESS_TIMEZONE = "America/Denver"; // Mountain Time
-/** Short label shown next to times in the UI. */
+/** Short label for the practitioner-facing (Mountain) views. */
 export const BUSINESS_TZ_LABEL = "Mountain Time";
 
 /**

@@ -1,30 +1,105 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
-import { priceLabel, BUSINESS_TZ_LABEL } from "@/lib/content";
-import type { DayGrid, GridSlot } from "@/lib/scheduling";
+import { priceLabel } from "@/lib/content";
+import type { GridSlot } from "@/lib/scheduling";
 import type { Service } from "@/lib/types";
 
 type Props = {
   services: Service[];
-  gridByService: Record<string, DayGrid[]>;
+  slotsByService: Record<string, GridSlot[]>;
   preselectServiceId?: string;
 };
 
-export function BookingClient({ services, gridByService, preselectServiceId }: Props) {
+/** A slot with its time re-labeled in the visitor's local timezone. */
+type LocalSlot = GridSlot & { localLabel: string };
+
+/** A day's slots, grouped + labeled by the visitor's local calendar date. */
+type LocalDay = {
+  dateKey: string; // YYYY-MM-DD in the visitor's timezone
+  dayLabel: string; // "Thursday, June 18"
+  shortLabel: string; // "Thu 18"
+  slots: LocalSlot[];
+  hasAvailable: boolean;
+};
+
+/**
+ * Groups flat UTC slots into days using the visitor's own timezone, so a client
+ * in Texas sees Central times/days rather than the practitioner's Mountain ones.
+ * Runs in the browser (after mount) to read the local zone.
+ */
+function groupByLocalDay(slots: GridSlot[]): LocalDay[] {
+  const keyFmt = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  });
+  const dayFmt = new Intl.DateTimeFormat(undefined, {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+  const shortFmt = new Intl.DateTimeFormat(undefined, {
+    weekday: "short",
+    day: "numeric",
+  });
+  const timeFmt = new Intl.DateTimeFormat(undefined, {
+    hour: "numeric",
+    minute: "2-digit",
+  });
+
+  const byKey = new Map<string, LocalDay>();
+  for (const slot of slots) {
+    const start = new Date(slot.startsAt);
+    const dateKey = keyFmt.format(start);
+    let day = byKey.get(dateKey);
+    if (!day) {
+      day = {
+        dateKey,
+        dayLabel: dayFmt.format(start),
+        shortLabel: shortFmt.format(start),
+        slots: [],
+        hasAvailable: false,
+      };
+      byKey.set(dateKey, day);
+    }
+    day.slots.push({ ...slot, localLabel: timeFmt.format(start) });
+    if (slot.available) day.hasAvailable = true;
+  }
+
+  return [...byKey.values()].sort((a, b) => a.dateKey.localeCompare(b.dateKey));
+}
+
+/** Short abbreviation for the visitor's timezone, e.g. "CDT". */
+function localTzAbbr(): string {
+  const part = new Intl.DateTimeFormat(undefined, { timeZoneName: "short" })
+    .formatToParts(new Date())
+    .find((p) => p.type === "timeZoneName");
+  return part?.value ?? "";
+}
+
+export function BookingClient({ services, slotsByService, preselectServiceId }: Props) {
   const initial =
     services.find((s) => s.id === preselectServiceId) ?? services[0];
   const [serviceId, setServiceId] = useState(initial?.id);
   const [dateKey, setDateKey] = useState<string | undefined>(undefined);
-  const [slot, setSlot] = useState<GridSlot | null>(null);
+  const [slot, setSlot] = useState<LocalSlot | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Timezone-dependent labels are computed client-side; gate them behind mount
+  // so server and first client render match (no hydration mismatch).
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const service = services.find((s) => s.id === serviceId) ?? services[0];
   const isFree = service?.priceCents === 0;
-  const grid = gridByService[serviceId ?? ""] ?? [];
+  const grid = useMemo(
+    () => groupByLocalDay(slotsByService[serviceId ?? ""] ?? []),
+    [slotsByService, serviceId],
+  );
+  const tzAbbr = useMemo(() => (mounted ? localTzAbbr() : ""), [mounted]);
   const selectedDay = grid.find((d) => d.dateKey === dateKey);
 
   // When the service changes, reset to its first day with open times.
@@ -47,6 +122,7 @@ export function BookingClient({ services, gridByService, preselectServiceId }: P
           serviceId: service.id,
           startsAt: slot.startsAt,
           endsAt: slot.endsAt,
+          clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           ...form,
         }),
       });
@@ -100,11 +176,15 @@ export function BookingClient({ services, gridByService, preselectServiceId }: P
           <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
             <h2 className="text-2xl">2 · Pick a time</h2>
             <span className="text-xs font-medium uppercase tracking-wide text-charcoal/50">
-              All times in {BUSINESS_TZ_LABEL}
+              Times shown in your local time{tzAbbr && ` (${tzAbbr})`}
             </span>
           </div>
 
-          {!anyAvailability ? (
+          {!mounted ? (
+            <p className="rounded-xl border border-sage/40 bg-white/60 p-5 text-sm text-charcoal/60">
+              Loading available times…
+            </p>
+          ) : !anyAvailability ? (
             <p className="rounded-xl border border-sage/40 bg-white/60 p-5 text-sm text-charcoal/60">
               No open times in the next few weeks. Please check back soon or reach
               out directly.
@@ -160,7 +240,7 @@ export function BookingClient({ services, gridByService, preselectServiceId }: P
                                 : "cursor-not-allowed border-transparent bg-sage/10 text-charcoal/30 line-through"
                           }`}
                         >
-                          {s.label}
+                          {s.localLabel}
                         </button>
                       );
                     })}
@@ -226,7 +306,7 @@ export function BookingClient({ services, gridByService, preselectServiceId }: P
               label="Time"
               value={
                 slot && selectedDay
-                  ? `${selectedDay.dayLabel} · ${slot.label}`
+                  ? `${selectedDay.dayLabel} · ${slot.localLabel}${tzAbbr ? ` (${tzAbbr})` : ""}`
                   : "Select a time"
               }
             />

@@ -29,6 +29,7 @@ export type Appointment = {
   client_name: string;
   client_email: string;
   client_phone: string | null;
+  client_timezone: string | null; // IANA zone the client booked from
   notes: string | null;
   starts_at: string; // ISO timestamp
   ends_at: string; // ISO timestamp

@@ -13,6 +13,7 @@ type Body = {
   email: string;
   phone?: string;
   notes?: string;
+  clientTimezone?: string;
 };
 
 export async function POST(req: Request) {
@@ -23,7 +24,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  const { serviceId, startsAt, endsAt, name, email, phone, notes } = body;
+  const { serviceId, startsAt, endsAt, name, email, phone, notes, clientTimezone } = body;
   if (!serviceId || !startsAt || !endsAt || !name || !email) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
   }
@@ -45,6 +46,7 @@ export async function POST(req: Request) {
     client_name: name,
     client_email: email,
     client_phone: phone ?? "",
+    client_timezone: clientTimezone ?? "",
     notes: notes ?? "",
     amount_cents: String(service.priceCents),
   };

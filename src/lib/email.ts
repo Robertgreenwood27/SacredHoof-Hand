@@ -1,12 +1,7 @@
 import { Resend } from "resend";
 import { formatInTimeZone } from "date-fns-tz";
 import { env, emailConfigured } from "./env";
-import {
-  priceLabel,
-  AFTERCARE,
-  BUSINESS_TIMEZONE,
-  BUSINESS_TZ_LABEL,
-} from "./content";
+import { priceLabel, AFTERCARE, BUSINESS_TIMEZONE } from "./content";
 import type { Appointment } from "./types";
 
 const resend = emailConfigured ? new Resend(env.resendApiKey) : null;
@@ -20,14 +15,20 @@ type BookingEmailInput = Pick<
   | "ends_at"
   | "amount_cents"
   | "notes"
+  | "client_timezone"
 >;
 
-function when(appt: BookingEmailInput) {
-  const tz = BUSINESS_TIMEZONE;
+/**
+ * Renders the appointment date/time in a given timezone, with the zone's
+ * abbreviation (e.g. "MDT", "CST") so each recipient reads it in their own
+ * frame: the client in the zone they booked from, the practitioner in Mountain.
+ */
+function when(appt: BookingEmailInput, tz: string) {
   const day = formatInTimeZone(appt.starts_at, tz, "EEEE, MMMM d, yyyy");
   const start = formatInTimeZone(appt.starts_at, tz, "h:mm a");
   const end = formatInTimeZone(appt.ends_at, tz, "h:mm a");
-  return `${day} · ${start} – ${end} (${BUSINESS_TZ_LABEL})`;
+  const abbr = formatInTimeZone(appt.starts_at, tz, "zzz");
+  return `${day} · ${start} – ${end} (${abbr})`;
 }
 
 const wrap = (inner: string) => `
@@ -48,7 +49,13 @@ const wrap = (inner: string) => `
 
 /** Builds the rendered subjects + HTML for both emails (no sending). */
 export function buildBookingEmails(appt: BookingEmailInput) {
-  const subjectClient = `Your Reiki session is confirmed — ${when(appt)}`;
+  // Client sees the time in the zone they booked from; the practitioner always
+  // sees Mountain. Falls back to Mountain if we never captured the client's zone.
+  const clientTz = appt.client_timezone || BUSINESS_TIMEZONE;
+  const whenClient = when(appt, clientTz);
+  const whenPractitioner = when(appt, BUSINESS_TIMEZONE);
+
+  const subjectClient = `Your Reiki session is confirmed — ${whenClient}`;
   const subjectPractitioner = `New booking: ${appt.client_name} — ${appt.service_name}`;
 
   const supportsList = AFTERCARE.supports
@@ -63,7 +70,7 @@ export function buildBookingEmails(appt: BookingEmailInput) {
     <p>Your session is confirmed. Here are the details:</p>
     <table style="width:100%; border-collapse:collapse; margin:16px 0;">
       <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Service</td><td style="padding:6px 0;">${appt.service_name}</td></tr>
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">When</td><td style="padding:6px 0;">${when(appt)}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">When</td><td style="padding:6px 0;">${whenClient}</td></tr>
       <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Paid</td><td style="padding:6px 0;">${priceLabel(appt.amount_cents)}</td></tr>
     </table>
     <p>Take a few moments before our time together to settle in and set an intention. I look forward to holding space for you.</p>
@@ -83,7 +90,7 @@ export function buildBookingEmails(appt: BookingEmailInput) {
     <table style="width:100%; border-collapse:collapse; margin:16px 0;">
       <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Client</td><td style="padding:6px 0;">${appt.client_name} (${appt.client_email})</td></tr>
       <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Service</td><td style="padding:6px 0;">${appt.service_name}</td></tr>
-      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">When</td><td style="padding:6px 0;">${when(appt)}</td></tr>
+      <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">When</td><td style="padding:6px 0;">${whenPractitioner}</td></tr>
       <tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Paid</td><td style="padding:6px 0;">${priceLabel(appt.amount_cents)}</td></tr>
       ${appt.notes ? `<tr><td style="padding:6px 16px 6px 0; color:#8a857c; vertical-align:top; white-space:nowrap;">Notes</td><td style="padding:6px 0;">${appt.notes}</td></tr>` : ""}
     </table>

@@ -95,9 +95,15 @@ function Row({ appt }: { appt: Appointment }) {
         </div>
         <p className="text-sm text-charcoal/70">{appt.service_name}</p>
         <p className="text-sm text-charcoal/50">
-          {formatInTimeZone(appt.starts_at, BUSINESS_TIMEZONE, "EEE MMM d, yyyy · h:mm a")}{" "}
+          {formatInTimeZone(appt.starts_at, BUSINESS_TIMEZONE, "EEE MMM d, yyyy · h:mm a zzz")}{" "}
           · {appt.client_email}
         </p>
+        {appt.client_timezone && appt.client_timezone !== BUSINESS_TIMEZONE && (
+          <p className="text-xs text-charcoal/40">
+            Client&apos;s local time:{" "}
+            {formatInTimeZone(appt.starts_at, appt.client_timezone, "h:mm a zzz")}
+          </p>
+        )}
         {appt.notes && (
           <p className="mt-1 text-sm italic text-charcoal/50">“{appt.notes}”</p>
         )}

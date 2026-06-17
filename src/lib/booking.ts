@@ -41,6 +41,7 @@ export async function createConfirmedAppointment(
       client_name: meta.client_name,
       client_email: meta.client_email,
       client_phone: meta.client_phone || null,
+      client_timezone: meta.client_timezone || null,
       notes: meta.notes || null,
       starts_at: meta.starts_at,
       ends_at: meta.ends_at,
@@ -58,5 +59,6 @@ export async function createConfirmedAppointment(
     ends_at: meta.ends_at,
     amount_cents: Number(meta.amount_cents),
     notes: meta.notes || null,
+    client_timezone: meta.client_timezone || null,
   });
 }

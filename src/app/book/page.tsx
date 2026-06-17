@@ -26,8 +26,11 @@ export default async function BookPage({
     addDays(now, 30).toISOString(),
   );
 
-  // Pre-compute the time grid per service duration so switching is instant.
-  const gridByService = Object.fromEntries(
+  // Pre-compute candidate slots per service duration so switching is instant.
+  // We emit a flat list of UTC instants; the client groups + labels them in the
+  // visitor's own timezone (slots are authored in Mountain, but each is stored
+  // as a timezone-neutral instant, so a Texas visitor sees Central time).
+  const slotsByService = Object.fromEntries(
     services.map((s) => [
       s.id,
       generateDayGrid({
@@ -36,7 +39,7 @@ export default async function BookPage({
         durationMinutes: s.durationMinutes,
         timeZone: BUSINESS_TIMEZONE,
         leadHours: BOOKING_LEAD_HOURS,
-      }),
+      }).flatMap((d) => d.slots),
     ]),
   );
 
@@ -59,7 +62,7 @@ export default async function BookPage({
 
       <BookingClient
         services={services}
-        gridByService={gridByService}
+        slotsByService={slotsByService}
         preselectServiceId={preselect}
       />
 

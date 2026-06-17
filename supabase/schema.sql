@@ -54,6 +54,7 @@ create table if not exists public.appointments (
   client_name       text not null,
   client_email      text not null,
   client_phone      text,
+  client_timezone   text,  -- IANA zone the client booked from (e.g. America/Chicago)
   notes             text,
   starts_at         timestamptz not null,
   ends_at           timestamptz not null,
@@ -63,6 +64,10 @@ create table if not exists public.appointments (
   stripe_session_id text,
   created_at        timestamptz default now()
 );
+
+-- Backfill for databases created before client_timezone existed.
+alter table public.appointments
+  add column if not exists client_timezone text;
 
 create index if not exists appointments_starts_at_idx
   on public.appointments (starts_at);
