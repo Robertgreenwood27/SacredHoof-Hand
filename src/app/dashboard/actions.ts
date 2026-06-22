@@ -66,3 +66,27 @@ export async function deleteAvailabilityRule(id: string) {
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/availability");
 }
+
+export async function blockDay(formData: FormData) {
+  const supabase = await requireAdmin();
+  const day = String(formData.get("day") ?? "").trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    throw new Error("Please pick a valid date to block off.");
+  }
+  const reason = String(formData.get("reason") ?? "").trim();
+  // upsert so re-blocking an already-blocked day is a no-op, not an error.
+  const { error } = await supabase
+    .from("blocked_days")
+    .upsert({ day, reason: reason || null });
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/availability");
+  revalidatePath("/book");
+}
+
+export async function unblockDay(day: string) {
+  const supabase = await requireAdmin();
+  const { error } = await supabase.from("blocked_days").delete().eq("day", day);
+  if (error) throw new Error(error.message);
+  revalidatePath("/dashboard/availability");
+  revalidatePath("/book");
+}

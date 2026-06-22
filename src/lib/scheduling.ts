@@ -22,6 +22,8 @@ export type DayGrid = {
 type GenerateArgs = {
   rules: AvailabilityRule[];
   booked: { starts_at: string; ends_at: string }[];
+  /** Date keys (YYYY-MM-DD, business timezone) the practitioner has blocked off. */
+  blockedDays?: string[];
   durationMinutes: number;
   timeZone: string;
   /** Granularity of offered start times, in minutes. */
@@ -47,6 +49,7 @@ const toMinutes = (hhmm: string) => {
 export function generateDayGrid({
   rules,
   booked,
+  blockedDays = [],
   durationMinutes,
   timeZone,
   stepMinutes = 30,
@@ -54,6 +57,7 @@ export function generateDayGrid({
   leadHours = 12,
 }: GenerateArgs): DayGrid[] {
   const days: DayGrid[] = [];
+  const blocked = new Set(blockedDays);
   const nowUtc = new Date();
   const earliest = addMinutes(nowUtc, leadHours * 60);
   const nowZoned = toZonedTime(nowUtc, timeZone);
@@ -69,6 +73,8 @@ export function generateDayGrid({
     if (dayRules.length === 0) continue;
 
     const dateKey = `${year}-${pad(month)}-${pad(date)}`;
+    if (blocked.has(dateKey)) continue; // practitioner has the day off
+
     const startMin = Math.min(...dayRules.map((r) => toMinutes(r.start_time)));
     const endMax = Math.max(...dayRules.map((r) => toMinutes(r.end_time)));
 

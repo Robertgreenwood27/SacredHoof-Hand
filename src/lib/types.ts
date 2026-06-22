@@ -47,6 +47,12 @@ export type AvailabilityRule = {
   end_time: string; // "HH:MM" 24h
 };
 
+/** A full day the practitioner has blocked off (no bookings offered). */
+export type BlockedDay = {
+  day: string; // "YYYY-MM-DD" in the business timezone
+  reason: string | null;
+};
+
 export type TimeSlot = {
   startsAt: string; // ISO
   endsAt: string; // ISO

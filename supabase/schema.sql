@@ -45,6 +45,15 @@ create table if not exists public.availability_rules (
 );
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- blocked_days: full days the practitioner has taken off. No bookings are
+-- offered on these dates. `day` is a calendar date in the BUSINESS timezone.
+-- ─────────────────────────────────────────────────────────────────────────
+create table if not exists public.blocked_days (
+  day    date primary key,  -- YYYY-MM-DD in the business timezone
+  reason text
+);
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- appointments: a booked session (created by the Stripe webhook / dev fallback)
 -- ─────────────────────────────────────────────────────────────────────────
 create table if not exists public.appointments (
@@ -81,6 +90,7 @@ create index if not exists appointments_starts_at_idx
 alter table public.site_content       enable row level security;
 alter table public.services           enable row level security;
 alter table public.availability_rules enable row level security;
+alter table public.blocked_days       enable row level security;
 alter table public.appointments       enable row level security;
 
 -- Public read
@@ -94,6 +104,9 @@ create policy "public read services" on public.services
 drop policy if exists "public read availability" on public.availability_rules;
 create policy "public read availability" on public.availability_rules
   for select using (true);
+drop policy if exists "public read blocked days" on public.blocked_days;
+create policy "public read blocked days" on public.blocked_days
+  for select using (true);
 
 -- Authenticated full management
 drop policy if exists "auth manage content" on public.site_content;
@@ -104,6 +117,9 @@ create policy "auth manage services" on public.services
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 drop policy if exists "auth manage availability" on public.availability_rules;
 create policy "auth manage availability" on public.availability_rules
+  for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+drop policy if exists "auth manage blocked days" on public.blocked_days;
+create policy "auth manage blocked days" on public.blocked_days
   for all using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- Appointments: dashboard reads/writes use the Supabase secret key, which

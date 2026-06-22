@@ -11,6 +11,7 @@ import {
 } from "./content";
 import type {
   AvailabilityRule,
+  BlockedDay,
   HeroContent,
   Service,
   Appointment,
@@ -91,6 +92,24 @@ export async function getAvailabilityRules(): Promise<AvailabilityRule[]> {
     .order("day_of_week", { ascending: true });
 
   if (error || !data || data.length === 0) return DEFAULT_AVAILABILITY;
+  return data;
+}
+
+/**
+ * Full days the practitioner has blocked off (taken as days off), each a
+ * "YYYY-MM-DD" date key in the business timezone, ordered ascending. Empty
+ * array if not configured or if Supabase isn't set up.
+ */
+export async function getBlockedDays(): Promise<BlockedDay[]> {
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return [];
+
+  const { data, error } = await supabase
+    .from("blocked_days")
+    .select("day, reason")
+    .order("day", { ascending: true });
+
+  if (error || !data) return [];
   return data;
 }
 

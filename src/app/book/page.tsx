@@ -2,7 +2,12 @@ import Link from "next/link";
 import { Navbar } from "@/components/Navbar";
 import { Footer } from "@/components/Footer";
 import { BookingClient } from "@/components/BookingClient";
-import { getServices, getAvailabilityRules, getBookedAppointments } from "@/lib/data";
+import {
+  getServices,
+  getAvailabilityRules,
+  getBookedAppointments,
+  getBlockedDays,
+} from "@/lib/data";
 import { generateDayGrid } from "@/lib/scheduling";
 import { BUSINESS_TIMEZONE, BOOKING_LEAD_HOURS } from "@/lib/content";
 import { addDays } from "date-fns";
@@ -15,9 +20,10 @@ export default async function BookPage({
   searchParams: Promise<{ service?: string }>;
 }) {
   const { service: preselect } = await searchParams;
-  const [services, rules] = await Promise.all([
+  const [services, rules, blockedDays] = await Promise.all([
     getServices(),
     getAvailabilityRules(),
+    getBlockedDays(),
   ]);
 
   const now = new Date();
@@ -25,6 +31,7 @@ export default async function BookPage({
     now.toISOString(),
     addDays(now, 30).toISOString(),
   );
+  const blockedDayKeys = blockedDays.map((b) => b.day);
 
   // Pre-compute candidate slots per service duration so switching is instant.
   // We emit a flat list of UTC instants; the client groups + labels them in the
@@ -36,6 +43,7 @@ export default async function BookPage({
       generateDayGrid({
         rules,
         booked,
+        blockedDays: blockedDayKeys,
         durationMinutes: s.durationMinutes,
         timeZone: BUSINESS_TIMEZONE,
         leadHours: BOOKING_LEAD_HOURS,

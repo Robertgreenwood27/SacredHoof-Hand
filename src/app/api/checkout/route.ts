@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { formatInTimeZone } from "date-fns-tz";
 import { stripe, stripeConfigured } from "@/lib/stripe";
-import { getServiceById } from "@/lib/data";
+import { getServiceById, getBlockedDays } from "@/lib/data";
 import { createConfirmedAppointment, hasUsedFreeSession } from "@/lib/booking";
-import { FREE_SESSION_OFFER, isFreeSessionActive } from "@/lib/content";
+import {
+  BUSINESS_TIMEZONE,
+  FREE_SESSION_OFFER,
+  isFreeSessionActive,
+} from "@/lib/content";
 import { env } from "@/lib/env";
 
 type Body = {
@@ -32,6 +37,21 @@ export async function POST(req: Request) {
   const service = await getServiceById(serviceId);
   if (!service) {
     return NextResponse.json({ error: "Unknown service." }, { status: 404 });
+  }
+
+  // Reject bookings on days the practitioner has blocked off. The picker already
+  // hides these, but guard here in case of a stale/direct request.
+  const requestedDay = formatInTimeZone(
+    new Date(startsAt),
+    BUSINESS_TIMEZONE,
+    "yyyy-MM-dd",
+  );
+  const blockedDays = await getBlockedDays();
+  if (blockedDays.some((b) => b.day === requestedDay)) {
+    return NextResponse.json(
+      { error: "That day is no longer available. Please choose another time." },
+      { status: 409 },
+    );
   }
 
   // Return to whatever origin the booking came from (e.g. the live domain),
