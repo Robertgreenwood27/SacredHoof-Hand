@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
 import { priceLabel } from "@/lib/content";
+import { isValidEmail } from "@/lib/validation";
 import type { GridSlot } from "@/lib/scheduling";
 import type { Service } from "@/lib/types";
 
@@ -139,7 +140,12 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
     }
   }
 
-  const canSubmit = service && slot && form.name && form.email && !submitting;
+  // The email <input type="email"> doesn't self-validate here because we submit
+  // via a button click, not a native form submit — so check the shape ourselves.
+  const emailValid = isValidEmail(form.email);
+  const showEmailError = form.email.trim().length > 0 && !emailValid;
+  const canSubmit =
+    service && slot && form.name.trim() && emailValid && !submitting;
   const anyAvailability = grid.some((d) => d.hasAvailable);
 
   return (
@@ -273,7 +279,14 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="jane@example.com"
+                aria-invalid={showEmailError}
               />
+              {showEmailError && (
+                <span className="mt-1 block text-xs text-terracotta">
+                  Please enter a valid email address so we can send your
+                  confirmation.
+                </span>
+              )}
             </Field>
             <Field label="Phone (optional)">
               <input

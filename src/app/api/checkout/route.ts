@@ -9,6 +9,7 @@ import {
   isFreeSessionActive,
 } from "@/lib/content";
 import { env } from "@/lib/env";
+import { isValidEmail } from "@/lib/validation";
 
 type Body = {
   serviceId: string;
@@ -32,6 +33,22 @@ export async function POST(req: Request) {
   const { serviceId, startsAt, endsAt, name, email, phone, notes, clientTimezone } = body;
   if (!serviceId || !startsAt || !endsAt || !name || !email) {
     return NextResponse.json({ error: "Missing required fields." }, { status: 400 });
+  }
+
+  // Trim and validate before anything else. A malformed email (e.g. a stray
+  // last name dropped into the wrong field) would otherwise sail past the
+  // one-per-client free-session guard AND make both confirmation emails fail
+  // silently — leaving a confirmed appointment nobody was notified about.
+  const cleanName = name.trim();
+  const cleanEmail = email.trim();
+  if (!cleanName) {
+    return NextResponse.json({ error: "Please enter your name." }, { status: 400 });
+  }
+  if (!isValidEmail(cleanEmail)) {
+    return NextResponse.json(
+      { error: "Please enter a valid email address." },
+      { status: 400 },
+    );
   }
 
   const service = await getServiceById(serviceId);
@@ -63,8 +80,8 @@ export async function POST(req: Request) {
     service_name: service.name,
     starts_at: startsAt,
     ends_at: endsAt,
-    client_name: name,
-    client_email: email,
+    client_name: cleanName,
+    client_email: cleanEmail,
     client_phone: phone ?? "",
     client_timezone: clientTimezone ?? "",
     notes: notes ?? "",
@@ -79,7 +96,7 @@ export async function POST(req: Request) {
         { status: 410 },
       );
     }
-    if (FREE_SESSION_OFFER.onePerClient && (await hasUsedFreeSession(email, service.id))) {
+    if (FREE_SESSION_OFFER.onePerClient && (await hasUsedFreeSession(cleanEmail, service.id))) {
       return NextResponse.json(
         { error: "It looks like you've already booked your complimentary session." },
         { status: 409 },
@@ -101,7 +118,7 @@ export async function POST(req: Request) {
   // --- Real Stripe Checkout -------------------------------------------------
   const session = await stripe.checkout.sessions.create({
     mode: "payment",
-    customer_email: email,
+    customer_email: cleanEmail,
     line_items: [
       {
         quantity: 1,

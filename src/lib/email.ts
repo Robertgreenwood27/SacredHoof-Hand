@@ -2,6 +2,7 @@ import { Resend } from "resend";
 import { formatInTimeZone } from "date-fns-tz";
 import { env, emailConfigured } from "./env";
 import { priceLabel, AFTERCARE, BUSINESS_TIMEZONE } from "./content";
+import { isValidEmail } from "./validation";
 import type { Appointment } from "./types";
 
 const resend = emailConfigured ? new Resend(env.resendApiKey) : null;
@@ -123,27 +124,42 @@ export async function sendBookingEmails(appt: BookingEmailInput) {
     return;
   }
 
+  // Only send the client confirmation to a deliverable address, and only use
+  // the client's email as the practitioner's reply-to when it's valid — an
+  // invalid reply-to makes Resend reject the send, which would otherwise take
+  // down the practitioner's notification too.
+  const clientEmailValid = isValidEmail(appt.client_email);
+
   const [clientRes, practitionerRes] = await Promise.all([
     // Client confirmation — replies go to the practitioner.
-    resend.emails.send({
-      from: env.emailFrom,
-      to: appt.client_email,
-      replyTo: env.practitionerEmail,
-      subject: subjectClient,
-      html: clientHtml,
-    }),
-    // Practitioner notification — replies go straight to the client.
+    clientEmailValid
+      ? resend.emails.send({
+          from: env.emailFrom,
+          to: appt.client_email,
+          replyTo: env.practitionerEmail,
+          subject: subjectClient,
+          html: clientHtml,
+        })
+      : Promise.resolve(null),
+    // Practitioner notification — replies go straight to the client when we
+    // have a valid address to reply to.
     resend.emails.send({
       from: env.emailFrom,
       to: env.practitionerEmail,
-      replyTo: appt.client_email,
+      ...(clientEmailValid ? { replyTo: appt.client_email } : {}),
       subject: subjectPractitioner,
       html: practitionerHtml,
     }),
   ]);
 
+  if (!clientEmailValid) {
+    console.error(
+      "[email] skipped client confirmation — invalid client email:",
+      appt.client_email,
+    );
+  }
   // Resend returns errors in the payload rather than throwing — surface them.
-  if (clientRes.error) {
+  if (clientRes?.error) {
     console.error("[email] client confirmation failed:", clientRes.error);
   }
   if (practitionerRes.error) {
