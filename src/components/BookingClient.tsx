@@ -232,8 +232,8 @@ export function BookingClient({
   const anyAvailability = grid.some((d) => d.hasAvailable);
 
   return (
-    <div className="section grid gap-10 py-16 lg:grid-cols-[1.4fr_1fr]">
-      <div className="space-y-10">
+    <div className="section grid min-w-0 gap-8 py-10 sm:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,21rem)] lg:gap-8 lg:py-16 xl:gap-10">
+      <div className="min-w-0 space-y-10">
         {/* Step 1: choose a service */}
         <section>
           <h2 className="mb-4 text-2xl">1 · Choose your session</h2>
@@ -283,7 +283,7 @@ export function BookingClient({
           ) : (
             <>
               {/* Day selector */}
-              <div className="-mx-1 mb-5 flex gap-2 overflow-x-auto px-1 pb-2">
+              <div className="-mx-1 mb-5 flex max-w-full gap-2 overflow-x-auto overscroll-x-contain px-1 pb-2">
                 {grid.map((day) => {
                   const active = day.dateKey === dateKey;
                   return (
@@ -580,8 +580,8 @@ export function BookingClient({
       </div>
 
       {/* Summary / checkout */}
-      <aside className="lg:sticky lg:top-8 lg:self-start">
-        <div className="rounded-3xl border border-sage/40 bg-white/80 p-7 shadow-sm">
+      <aside className="min-w-0 lg:sticky lg:top-8 lg:self-start">
+        <div className="w-full rounded-3xl border border-sage/40 bg-white/80 p-5 shadow-sm sm:p-7">
           <h3 className="text-2xl">Your booking</h3>
           <dl className="mt-5 space-y-3 text-sm">
             <Row label="Session" value={service?.name ?? "—"} />
@@ -762,13 +762,13 @@ function Row({
   emphasize?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-3">
+    <div className="flex min-w-0 items-start justify-between gap-3">
       <dt className="shrink-0 text-charcoal/60">{label}</dt>
       <dd
         className={
           emphasize
             ? "font-heading text-2xl text-terracotta"
-            : "text-right text-charcoal"
+            : "min-w-0 break-words text-right text-charcoal"
         }
       >
         {value}
