@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
-import { addHours, subMinutes } from "date-fns";
+import { subMinutes } from "date-fns";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { env, emailConfigured } from "@/lib/env";
+import { BUSINESS_TIMEZONE } from "@/lib/content";
 import {
   sendReminderEmails,
   type EmailRecipients,
@@ -26,6 +28,13 @@ const recipientColumns = {
     sent: "practitioner_reminder_sent_at",
   },
 } as const;
+
+function addCalendarDays(dateKey: string, days: number): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day + days))
+    .toISOString()
+    .slice(0, 10);
+}
 
 function authorized(request: Request): boolean {
   if (!env.cronSecret) return process.env.NODE_ENV !== "production";
@@ -211,10 +220,10 @@ async function completeReminder(
 }
 
 /**
- * Runs hourly. It includes every unsent confirmed future appointment inside
- * the next 25 hours, so late bookings and a previously missed cron run are
- * still picked up. Per-recipient leases plus Resend idempotency keys make
- * overlapping invocations safe and allow partial-delivery retries.
+ * Runs once each morning and includes every unsent confirmed appointment on
+ * tomorrow's calendar date in the practitioner's timezone. Per-recipient
+ * leases plus Resend idempotency keys make retries safe and allow partial
+ * delivery recovery.
  */
 export async function GET(request: Request) {
   if (!authorized(request)) {
@@ -238,14 +247,27 @@ export async function GET(request: Request) {
   await expirePendingBookingHolds();
 
   const now = new Date();
-  const from = now.toISOString();
-  const to = addHours(now, 25).toISOString();
+  const today = formatInTimeZone(
+    now,
+    BUSINESS_TIMEZONE,
+    "yyyy-MM-dd",
+  );
+  const reminderDay = addCalendarDays(today, 1);
+  const dayAfterReminder = addCalendarDays(today, 2);
+  const from = fromZonedTime(
+    `${reminderDay}T00:00:00`,
+    BUSINESS_TIMEZONE,
+  ).toISOString();
+  const to = fromZonedTime(
+    `${dayAfterReminder}T00:00:00`,
+    BUSINESS_TIMEZONE,
+  ).toISOString();
   const { data, error } = await supabase
     .from("appointments")
     .select("*")
     .eq("status", "confirmed")
-    .gt("starts_at", from)
-    .lte("starts_at", to)
+    .gte("starts_at", from)
+    .lt("starts_at", to)
     .or(
       "client_reminder_sent_at.is.null,practitioner_reminder_sent_at.is.null",
     )
@@ -301,6 +323,11 @@ export async function GET(request: Request) {
     recipientDeliveries,
     completed,
     failures,
-    window: { from, to },
+    window: {
+      businessDate: reminderDay,
+      timeZone: BUSINESS_TIMEZONE,
+      from,
+      to,
+    },
   });
 }

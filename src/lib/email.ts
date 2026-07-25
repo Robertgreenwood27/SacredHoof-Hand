@@ -454,7 +454,7 @@ export async function sendAppointmentCancelledEmails(
   );
 }
 
-/** Sends a 24-hour reminder to both the client and practitioner. */
+/** Sends a day-before reminder to the client, practitioner, or both. */
 export async function sendReminderEmails(
   appt: AppointmentEmailInput,
   recipients: EmailRecipients = {},
