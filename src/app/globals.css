@@ -32,7 +32,7 @@ a {
   .btn-primary {
     @apply inline-flex items-center justify-center gap-2 rounded-full bg-terracotta px-7 py-3
       text-sm font-semibold uppercase tracking-wide text-ivory shadow-sm
-      transition hover:bg-[#b87a62] focus:outline-none focus-visible:ring-2
+      transition hover:bg-[#7f4334] focus:outline-none focus-visible:ring-2
       focus-visible:ring-gold focus-visible:ring-offset-2 disabled:opacity-50;
   }
 

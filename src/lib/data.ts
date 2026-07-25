@@ -17,6 +17,8 @@ import type {
   Appointment,
 } from "./types";
 
+const isProduction = process.env.NODE_ENV === "production";
+
 /**
  * Hero content from Supabase `site_content` (singleton row id=1), falling back
  * to DEFAULT_HERO when Supabase isn't configured or the row doesn't exist yet.
@@ -51,7 +53,12 @@ export async function getServices(): Promise<Service[]> {
   const freeSession = isFreeSessionActive() ? [FREE_SESSION_OFFER.service] : [];
 
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return [...freeSession, ...DEFAULT_SERVICES];
+  if (!supabase) {
+    if (isProduction) {
+      throw new Error("Service catalog storage is not configured.");
+    }
+    return [...freeSession, ...DEFAULT_SERVICES];
+  }
 
   const { data, error } = await supabase
     .from("services")
@@ -59,8 +66,14 @@ export async function getServices(): Promise<Service[]> {
     .eq("active", true)
     .order("price_cents", { ascending: true });
 
-  if (error || !data || data.length === 0) {
+  if (error) {
+    if (isProduction) {
+      throw new Error(`Could not load the service catalog: ${error.message}`);
+    }
     return [...freeSession, ...DEFAULT_SERVICES];
+  }
+  if (!data || data.length === 0) {
+    return isProduction ? freeSession : [...freeSession, ...DEFAULT_SERVICES];
   }
 
   const paid = data.map((s) => ({
@@ -84,14 +97,23 @@ export async function getServiceById(id: string): Promise<Service | null> {
 /** Weekly availability rules. Empty array if not configured. */
 export async function getAvailabilityRules(): Promise<AvailabilityRule[]> {
   const supabase = await createSupabaseServerClient();
-  if (!supabase) return DEFAULT_AVAILABILITY;
+  if (!supabase) return isProduction ? [] : DEFAULT_AVAILABILITY;
 
   const { data, error } = await supabase
     .from("availability_rules")
     .select("*")
     .order("day_of_week", { ascending: true });
 
-  if (error || !data || data.length === 0) return DEFAULT_AVAILABILITY;
+  if (error) {
+    if (isProduction) {
+      console.error("[availability] could not load rules", error);
+      return [];
+    }
+    return DEFAULT_AVAILABILITY;
+  }
+  if (!data || data.length === 0) {
+    return isProduction ? [] : DEFAULT_AVAILABILITY;
+  }
   return data;
 }
 
@@ -101,15 +123,27 @@ export async function getAvailabilityRules(): Promise<AvailabilityRule[]> {
  * array if not configured or if Supabase isn't set up.
  */
 export async function getBlockedDays(): Promise<BlockedDay[]> {
-  const supabase = await createSupabaseServerClient();
-  if (!supabase) return [];
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    if (isProduction) {
+      throw new Error("Private schedule storage is not configured.");
+    }
+    return [];
+  }
 
   const { data, error } = await supabase
     .from("blocked_days")
     .select("day, reason")
     .order("day", { ascending: true });
 
-  if (error || !data) return [];
+  if (error || !data) {
+    if (isProduction) {
+      throw new Error(
+        `Could not verify blocked schedule days: ${error?.message ?? "unknown error"}`,
+      );
+    }
+    return [];
+  }
   return data;
 }
 
@@ -122,19 +156,44 @@ export async function getBlockedDays(): Promise<BlockedDay[]> {
 export async function getBookedAppointments(
   fromIso: string,
   toIso: string,
+  excludeAppointmentId?: string,
 ): Promise<Pick<Appointment, "starts_at" | "ends_at">[]> {
   const supabase = createSupabaseAdminClient();
-  if (!supabase) return [];
+  if (!supabase) {
+    if (isProduction) {
+      throw new Error("Private appointment storage is not configured.");
+    }
+    return [];
+  }
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("appointments")
-    .select("starts_at, ends_at")
+    .select("id, starts_at, ends_at, status, hold_expires_at")
     .neq("status", "cancelled")
-    .gte("starts_at", fromIso)
-    .lte("starts_at", toIso);
+    // Any appointment whose range overlaps the requested window.
+    .lt("starts_at", toIso)
+    .gt("ends_at", fromIso);
 
-  if (error || !data) return [];
-  return data;
+  if (excludeAppointmentId) {
+    query = query.neq("id", excludeAppointmentId);
+  }
+
+  const { data, error } = await query;
+  if (error || !data) {
+    throw new Error(
+      `Could not verify booked appointments: ${error?.message ?? "unknown error"}`,
+    );
+  }
+
+  const now = Date.now();
+  return data
+    .filter(
+      (appointment) =>
+        appointment.status !== "pending" ||
+        (appointment.hold_expires_at &&
+          new Date(appointment.hold_expires_at).getTime() > now),
+    )
+    .map(({ starts_at, ends_at }) => ({ starts_at, ends_at }));
 }
 
 /**

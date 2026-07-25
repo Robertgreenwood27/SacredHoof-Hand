@@ -1,20 +1,5 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, Lato } from "next/font/google";
 import "./globals.css";
-
-const heading = Cormorant_Garamond({
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  variable: "--font-heading",
-  display: "swap",
-});
-
-const body = Lato({
-  subsets: ["latin"],
-  weight: ["300", "400", "700"],
-  variable: "--font-body",
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   metadataBase: new URL(
@@ -35,7 +20,7 @@ export default function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
   return (
-    <html lang="en" className={`${heading.variable} ${body.variable}`}>
+    <html lang="en">
       <body>{children}</body>
     </html>
   );

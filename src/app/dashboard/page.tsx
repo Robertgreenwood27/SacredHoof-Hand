@@ -1,8 +1,10 @@
 import { isAfter } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
+import Link from "next/link";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { setAppointmentStatus } from "./actions";
 import { formatPrice, BUSINESS_TIMEZONE } from "@/lib/content";
+import { expirePendingBookingHolds } from "@/lib/booking";
 import type { Appointment } from "@/lib/types";
 import { SetupNotice } from "@/components/dashboard/SetupNotice";
 
@@ -25,6 +27,10 @@ export default async function AppointmentsPage() {
       </Shell>
     );
   }
+
+  // Do not present abandoned Checkout reservations as active appointments.
+  // This uses the same guarded cleanup as public slot validation.
+  await expirePendingBookingHolds();
 
   const { data } = await supabase
     .from("appointments")
@@ -90,7 +96,7 @@ function Row({ appt }: { appt: Appointment }) {
           <span
             className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase ${statusStyles[appt.status]}`}
           >
-            {appt.status}
+            {appt.status === "pending" ? "Awaiting checkout" : appt.status}
           </span>
         </div>
         <p className="text-sm text-charcoal/70">{appt.service_name}</p>
@@ -109,15 +115,15 @@ function Row({ appt }: { appt: Appointment }) {
         )}
       </div>
 
-      <div className="flex shrink-0 items-center gap-2">
-        {appt.status !== "confirmed" && appt.status !== "cancelled" && (
-          <StatusButton id={appt.id} status="confirmed" label="Confirm" />
-        )}
-        {appt.status !== "completed" && appt.status !== "cancelled" && (
+      <div className="flex shrink-0 flex-wrap items-center gap-2">
+        <Link
+          href={`/dashboard/appointments/${appt.id}`}
+          className="rounded-full border border-terracotta/50 px-3 py-1.5 text-xs font-semibold text-terracotta transition hover:bg-terracotta/10"
+        >
+          Manage
+        </Link>
+        {appt.status === "confirmed" && (
           <StatusButton id={appt.id} status="completed" label="Mark done" subtle />
-        )}
-        {appt.status !== "cancelled" && (
-          <StatusButton id={appt.id} status="cancelled" label="Cancel" subtle />
         )}
       </div>
     </div>

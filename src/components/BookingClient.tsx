@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Check, Loader2 } from "lucide-react";
+import Link from "next/link";
 import { priceLabel } from "@/lib/content";
 import { isValidEmail } from "@/lib/validation";
 import type { GridSlot } from "@/lib/scheduling";
@@ -11,6 +12,12 @@ type Props = {
   services: Service[];
   slotsByService: Record<string, GridSlot[]>;
   preselectServiceId?: string;
+  agreementEvidence: {
+    termsVersion: string;
+    termsHash: string;
+    waiverVersion: string;
+    waiverHash: string;
+  };
 };
 
 /** A slot with its time re-labeled in the visitor's local timezone. */
@@ -80,13 +87,35 @@ function localTzAbbr(): string {
   return part?.value ?? "";
 }
 
-export function BookingClient({ services, slotsByService, preselectServiceId }: Props) {
+export function BookingClient({
+  services,
+  slotsByService,
+  preselectServiceId,
+  agreementEvidence,
+}: Props) {
   const initial =
     services.find((s) => s.id === preselectServiceId) ?? services[0];
   const [serviceId, setServiceId] = useState(initial?.id);
   const [dateKey, setDateKey] = useState<string | undefined>(undefined);
   const [slot, setSlot] = useState<LocalSlot | null>(null);
   const [form, setForm] = useState({ name: "", email: "", phone: "", notes: "" });
+  const [promoCode, setPromoCode] = useState("");
+  const [promotion, setPromotion] = useState<{
+    code: string;
+    amountCents: number;
+    discountPercent: number;
+  } | null>(null);
+  const [promoMessage, setPromoMessage] = useState<string | null>(null);
+  const [checkingPromo, setCheckingPromo] = useState(false);
+  const [agreements, setAgreements] = useState({
+    acceptedTerms: false,
+    acceptedWaiver: false,
+    authorizedSigner: false,
+    electronicConsent: false,
+    signatureName: "",
+    signerCapacity: "",
+    guardianRelationship: "",
+  });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Timezone-dependent labels are computed client-side; gate them behind mount
@@ -108,8 +137,46 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
     const firstAvailable = grid.find((d) => d.hasAvailable) ?? grid[0];
     setDateKey(firstAvailable?.dateKey);
     setSlot(null);
+    setPromoCode("");
+    setPromotion(null);
+    setPromoMessage(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [serviceId]);
+
+  async function applyPromoCode() {
+    if (!service || !promoCode.trim()) {
+      setPromotion(null);
+      setPromoMessage("Enter a discount code.");
+      return;
+    }
+    setCheckingPromo(true);
+    setPromoMessage(null);
+    try {
+      const res = await fetch("/api/promo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ serviceId: service.id, code: promoCode }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.valid) {
+        throw new Error(data.error ?? "That discount code is not valid.");
+      }
+      setPromotion({
+        code: data.code,
+        amountCents: data.amountCents,
+        discountPercent: data.discountPercent,
+      });
+      setPromoCode(data.code);
+      setPromoMessage(`${data.discountPercent}% discount applied.`);
+    } catch (e) {
+      setPromotion(null);
+      setPromoMessage(
+        e instanceof Error ? e.message : "That discount code is not valid.",
+      );
+    } finally {
+      setCheckingPromo(false);
+    }
+  }
 
   async function handleSubmit() {
     if (!service || !slot) return;
@@ -124,6 +191,9 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
           startsAt: slot.startsAt,
           endsAt: slot.endsAt,
           clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+          promoCode: promotion?.code ?? "",
+          ...agreementEvidence,
+          ...agreements,
           ...form,
         }),
       });
@@ -145,7 +215,20 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
   const emailValid = isValidEmail(form.email);
   const showEmailError = form.email.trim().length > 0 && !emailValid;
   const canSubmit =
-    service && slot && form.name.trim() && emailValid && !submitting;
+    service &&
+    slot &&
+    form.name.trim() &&
+    emailValid &&
+    agreements.acceptedTerms &&
+    agreements.acceptedWaiver &&
+    agreements.authorizedSigner &&
+    agreements.electronicConsent &&
+    agreements.signatureName.trim().length >= 2 &&
+    Boolean(agreements.signerCapacity) &&
+    (agreements.signerCapacity !== "parent_or_guardian" ||
+      agreements.guardianRelationship.trim().length >= 2) &&
+    (isFree || !promoCode.trim() || Boolean(promotion)) &&
+    !submitting;
   const anyAvailability = grid.some((d) => d.hasAvailable);
 
   return (
@@ -158,7 +241,9 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
             {services.map((s) => (
               <button
                 key={s.id}
+                type="button"
                 onClick={() => setServiceId(s.id)}
+                aria-pressed={s.id === serviceId}
                 className={`rounded-2xl border p-5 text-left transition ${
                   s.id === serviceId
                     ? "border-terracotta bg-terracotta/10 ring-1 ring-terracotta"
@@ -204,11 +289,13 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
                   return (
                     <button
                       key={day.dateKey}
+                      type="button"
                       onClick={() => {
                         setDateKey(day.dateKey);
                         setSlot(null);
                       }}
                       disabled={!day.hasAvailable}
+                      aria-pressed={active}
                       className={`shrink-0 rounded-xl border px-4 py-2 text-center text-sm transition ${
                         active
                           ? "border-terracotta bg-terracotta text-ivory"
@@ -235,8 +322,10 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
                       return (
                         <button
                           key={s.startsAt}
+                          type="button"
                           onClick={() => s.available && setSlot(s)}
                           disabled={!s.available}
+                          aria-pressed={active}
                           title={s.available ? undefined : "Unavailable"}
                           className={`rounded-lg border px-2 py-2 text-sm transition ${
                             active
@@ -267,6 +356,8 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
             <Field label="Full name" required>
               <input
                 className="input"
+                required
+                aria-required="true"
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
                 placeholder="Jane Doe"
@@ -276,13 +367,21 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
               <input
                 type="email"
                 className="input"
+                required
+                aria-required="true"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="jane@example.com"
                 aria-invalid={showEmailError}
+                aria-describedby={
+                  showEmailError ? "booking-email-error" : undefined
+                }
               />
               {showEmailError && (
-                <span className="mt-1 block text-xs text-terracotta">
+                <span
+                  id="booking-email-error"
+                  className="mt-1 block text-xs text-terracotta"
+                >
                   Please enter a valid email address so we can send your
                   confirmation.
                 </span>
@@ -306,6 +405,178 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
             </Field>
           </div>
         </section>
+
+        {/* Step 4: legal review and electronic signature */}
+        <section>
+          <h2 className="mb-4 text-2xl">4 · Review and sign</h2>
+          <div className="space-y-4 rounded-2xl border border-sage/40 bg-white/70 p-6">
+            <p className="text-sm leading-relaxed text-charcoal/65">
+              Your signed agreement is recorded before payment begins. Please
+              open and review both documents, then sign below.
+            </p>
+
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="I am signing as" required>
+                <select
+                  className="input"
+                  required
+                  aria-required="true"
+                  value={agreements.signerCapacity}
+                  onChange={(event) =>
+                    setAgreements({
+                      ...agreements,
+                      signerCapacity: event.target.value,
+                      guardianRelationship:
+                        event.target.value === "parent_or_guardian"
+                          ? agreements.guardianRelationship
+                          : "",
+                    })
+                  }
+                >
+                  <option value="">Choose one</option>
+                  <option value="self">The adult participant</option>
+                  <option value="parent_or_guardian">
+                    Parent or legal guardian
+                  </option>
+                </select>
+              </Field>
+              {agreements.signerCapacity === "parent_or_guardian" && (
+                <Field label="Relationship to participant" required>
+                  <input
+                    className="input"
+                    required
+                    aria-required="true"
+                    value={agreements.guardianRelationship}
+                    onChange={(event) =>
+                      setAgreements({
+                        ...agreements,
+                        guardianRelationship: event.target.value,
+                      })
+                    }
+                    placeholder="Parent or legal guardian"
+                  />
+                </Field>
+              )}
+            </div>
+
+            <label className="flex items-start gap-3 text-sm text-charcoal/80">
+              <input
+                type="checkbox"
+                required
+                className="mt-1 h-4 w-4 accent-[#C98C73]"
+                checked={agreements.acceptedTerms}
+                onChange={(event) =>
+                  setAgreements({
+                    ...agreements,
+                    acceptedTerms: event.target.checked,
+                  })
+                }
+              />
+              <span>
+                I have read and agree to the{" "}
+                <Link
+                  href="/terms"
+                  target="_blank"
+                  className="font-semibold text-terracotta underline"
+                >
+                  Terms of Service
+                </Link>
+                .
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 text-sm text-charcoal/80">
+              <input
+                type="checkbox"
+                required
+                className="mt-1 h-4 w-4 accent-[#C98C73]"
+                checked={agreements.authorizedSigner}
+                onChange={(event) =>
+                  setAgreements({
+                    ...agreements,
+                    authorizedSigner: event.target.checked,
+                  })
+                }
+              />
+              <span>
+                I am at least 18 years old, or I am the participant&apos;s
+                parent or legal guardian and am authorized to sign for them.
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 text-sm text-charcoal/80">
+              <input
+                type="checkbox"
+                required
+                className="mt-1 h-4 w-4 accent-[#C98C73]"
+                checked={agreements.acceptedWaiver}
+                onChange={(event) =>
+                  setAgreements({
+                    ...agreements,
+                    acceptedWaiver: event.target.checked,
+                  })
+                }
+              />
+              <span>
+                I have read, understand, and voluntarily sign the{" "}
+                <Link
+                  href="/liability-waiver"
+                  target="_blank"
+                  className="font-semibold text-terracotta underline"
+                >
+                  Liability Waiver and Assumption of Risk Agreement
+                </Link>
+                .
+              </span>
+            </label>
+
+            <label className="flex items-start gap-3 text-sm text-charcoal/80">
+              <input
+                type="checkbox"
+                required
+                className="mt-1 h-4 w-4 accent-[#C98C73]"
+                checked={agreements.electronicConsent}
+                onChange={(event) =>
+                  setAgreements({
+                    ...agreements,
+                    electronicConsent: event.target.checked,
+                  })
+                }
+              />
+              <span>
+                I consent to receive and retain these records electronically,
+                can access and save or print them, and intend my typed name to
+                be my electronic signature for this booking.
+              </span>
+            </label>
+
+            <Field label="Electronic signature (full legal name)" required>
+              <input
+                className="input"
+                required
+                aria-required="true"
+                autoComplete="name"
+                value={agreements.signatureName}
+                onChange={(event) =>
+                  setAgreements({
+                    ...agreements,
+                    signatureName: event.target.value,
+                  })
+                }
+                placeholder="Type your full legal name"
+              />
+            </Field>
+            <p className="text-xs leading-relaxed text-charcoal/50">
+              A time-stamped copy of the document versions you sign is retained
+              with the booking record. Payment and booking are disabled until
+              every item above is complete.
+            </p>
+            <p className="text-[11px] text-charcoal/40">
+              Terms version {agreementEvidence.termsVersion} · Waiver version{" "}
+              {agreementEvidence.waiverVersion}
+            </p>
+          </div>
+        </section>
       </div>
 
       {/* Summary / checkout */}
@@ -323,22 +594,106 @@ export function BookingClient({ services, slotsByService, preselectServiceId }: 
                   : "Select a time"
               }
             />
+            {!isFree && (
+              <div className="border-t border-sage/30 pt-4">
+                <label
+                  htmlFor="promo-code"
+                  className="mb-2 block text-xs font-semibold uppercase tracking-wide text-charcoal/55"
+                >
+                  Discount code
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="promo-code"
+                    className="input min-w-0 flex-1 uppercase"
+                    value={promoCode}
+                    onChange={(event) => {
+                      setPromoCode(event.target.value);
+                      setPromotion(null);
+                      setPromoMessage(null);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        void applyPromoCode();
+                      }
+                    }}
+                    placeholder="Enter code"
+                    aria-describedby={
+                      promoMessage ? "promo-code-status" : undefined
+                    }
+                  />
+                  <button
+                    type="button"
+                    onClick={() => void applyPromoCode()}
+                    disabled={checkingPromo || !promoCode.trim()}
+                    aria-busy={checkingPromo}
+                    aria-label={
+                      checkingPromo
+                        ? "Applying discount code"
+                        : "Apply discount code"
+                    }
+                    className="rounded-xl border border-sage/60 px-3 text-xs font-semibold uppercase tracking-wide text-charcoal/70 transition hover:border-terracotta disabled:opacity-50"
+                  >
+                    {checkingPromo ? (
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                    ) : (
+                      "Apply"
+                    )}
+                  </button>
+                </div>
+                {promoMessage && (
+                  <p
+                    id="promo-code-status"
+                    role="status"
+                    aria-live="polite"
+                    className={`mt-2 text-xs ${
+                      promotion ? "text-[#61705c]" : "text-terracotta"
+                    }`}
+                  >
+                    {promoMessage}
+                  </p>
+                )}
+              </div>
+            )}
             <div className="border-t border-sage/30 pt-3">
+              {promotion && (
+                <>
+                  <Row
+                    label="Original"
+                    value={service ? priceLabel(service.priceCents) : "—"}
+                  />
+                  <Row
+                    label="Discount"
+                    value={`-${promotion.discountPercent}%`}
+                  />
+                </>
+              )}
               <Row
                 label="Total"
-                value={service ? priceLabel(service.priceCents) : "—"}
+                value={
+                  service
+                    ? priceLabel(
+                        promotion?.amountCents ?? service.priceCents,
+                      )
+                    : "—"
+                }
                 emphasize
               />
             </div>
           </dl>
 
           {error && (
-            <p className="mt-4 rounded-lg bg-terracotta/15 px-3 py-2 text-sm text-terracotta">
+            <p
+              role="alert"
+              className="mt-4 rounded-lg bg-terracotta/15 px-3 py-2 text-sm text-terracotta"
+            >
               {error}
             </p>
           )}
 
           <button
+            type="button"
             onClick={handleSubmit}
             disabled={!canSubmit}
             className="btn-primary mt-6 w-full"

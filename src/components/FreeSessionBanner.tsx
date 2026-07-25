@@ -3,7 +3,7 @@ import { Sparkles } from "lucide-react";
 import { FREE_SESSION_OFFER } from "@/lib/content";
 
 /**
- * Featured promo banner for the limited-time free session. Renders nothing when
+ * Featured promo banner for the free intro session. Renders nothing when
  * the offer is inactive — controlled by FREE_SESSION_OFFER in src/lib/content.ts.
  */
 export function FreeSessionBanner() {
@@ -20,7 +20,7 @@ export function FreeSessionBanner() {
                 {FREE_SESSION_OFFER.badge}
               </span>
               <h2 className="mt-4 text-3xl md:text-4xl">
-                Your first session is on us
+                A complimentary session whenever you need one
               </h2>
               <p className="mt-2 text-charcoal/70">
                 {service.description}
@@ -30,7 +30,7 @@ export function FreeSessionBanner() {
               href={`/book?service=${service.id}`}
               className="btn-primary shrink-0"
             >
-              Claim your free session
+              Book a free session
             </Link>
           </div>
         </div>

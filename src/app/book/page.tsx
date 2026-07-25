@@ -10,6 +10,7 @@ import {
 } from "@/lib/data";
 import { generateDayGrid } from "@/lib/scheduling";
 import { BUSINESS_TIMEZONE, BOOKING_LEAD_HOURS } from "@/lib/content";
+import { CURRENT_AGREEMENT_EVIDENCE } from "@/lib/agreements";
 import { addDays } from "date-fns";
 
 export const dynamic = "force-dynamic";
@@ -54,7 +55,7 @@ export default async function BookPage({
   return (
     <main className="min-h-screen bg-ivory">
       <div className="relative bg-sage/30">
-        <Navbar />
+        <Navbar onLight />
         <div className="section pb-12 pt-32 text-center">
           <p className="eyebrow">Book your session</p>
           <h1 className="mt-3 text-4xl md:text-5xl">Reserve your time to heal</h1>
@@ -72,6 +73,7 @@ export default async function BookPage({
         services={services}
         slotsByService={slotsByService}
         preselectServiceId={preselect}
+        agreementEvidence={CURRENT_AGREEMENT_EVIDENCE}
       />
 
       <Footer />

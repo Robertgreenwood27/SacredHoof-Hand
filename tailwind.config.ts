@@ -11,14 +11,15 @@ const config: Config = {
         // Sacred Hoof & Hand palette
         ivory: "#F7F3EC",
         sage: "#A8B2A1",
-        terracotta: "#C98C73",
+        // Dark enough for readable body-size text and ivory button labels.
+        terracotta: "#95513F",
         gold: "#D6B56D",
         charcoal: "#3A3A3A",
       },
       fontFamily: {
-        // Wired up in layout.tsx via next/font CSS variables
-        heading: ["var(--font-heading)", "Cormorant Garamond", "serif"],
-        body: ["var(--font-body)", "Lato", "sans-serif"],
+        // Network-free stacks keep production builds deterministic.
+        heading: ["Georgia", "Cambria", "Times New Roman", "serif"],
+        body: ["Segoe UI", "Arial", "sans-serif"],
       },
       maxWidth: {
         content: "72rem",

@@ -1,5 +1,10 @@
 import Link from "next/link";
-import { CalendarDays, Image as ImageIcon, Clock } from "lucide-react";
+import {
+  CalendarDays,
+  Image as ImageIcon,
+  Clock,
+  Tags,
+} from "lucide-react";
 import { SignOutButton } from "@/components/SignOutButton";
 import { env } from "@/lib/env";
 
@@ -7,6 +12,7 @@ const nav = [
   { href: "/dashboard", label: "Appointments", icon: CalendarDays },
   { href: "/dashboard/hero", label: "Hero section", icon: ImageIcon },
   { href: "/dashboard/availability", label: "Availability", icon: Clock },
+  { href: "/dashboard/promotions", label: "Promo codes", icon: Tags },
 ];
 
 export default async function DashboardLayout({

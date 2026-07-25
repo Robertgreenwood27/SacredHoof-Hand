@@ -24,6 +24,7 @@ export type AppointmentStatus =
 
 export type Appointment = {
   id: string;
+  agreement_id: string | null;
   service_id: string | null;
   service_name: string;
   client_name: string;
@@ -35,7 +36,57 @@ export type Appointment = {
   ends_at: string; // ISO timestamp
   status: AppointmentStatus;
   amount_cents: number;
+  original_amount_cents: number;
+  discount_code: string | null;
+  discount_percent: number;
   stripe_session_id: string | null;
+  manage_token_hash: string | null;
+  hold_expires_at: string | null;
+  updated_at: string;
+  rescheduled_at: string | null;
+  reminder_sent_at: string | null;
+  client_reminder_sent_at: string | null;
+  practitioner_reminder_sent_at: string | null;
+  client_reminder_claimed_at: string | null;
+  practitioner_reminder_claimed_at: string | null;
+  confirmation_sent_at: string | null;
+  created_at: string;
+};
+
+/** Immutable evidence of the documents and electronic signature accepted. */
+export type BookingAgreement = {
+  id: string;
+  client_name: string;
+  client_email: string;
+  signature_name: string;
+  service_id: string;
+  starts_at: string;
+  ends_at: string;
+  terms_version: string;
+  terms_effective_date: string; // YYYY-MM-DD
+  terms_snapshot: string;
+  waiver_version: string;
+  waiver_snapshot: string;
+  electronic_consent: boolean;
+  signer_authority: boolean | null;
+  signer_capacity: "self" | "parent_or_guardian" | null;
+  guardian_relationship: string | null;
+  signed_at: string;
+  signer_ip: string | null;
+  signer_user_agent: string | null;
+  created_at: string;
+};
+
+/** One auditable appointment lifecycle transition. */
+export type AppointmentEvent = {
+  id: string;
+  appointment_id: string;
+  event_type: string;
+  actor: string;
+  old_starts_at: string | null;
+  old_ends_at: string | null;
+  new_starts_at: string | null;
+  new_ends_at: string | null;
   created_at: string;
 };
 

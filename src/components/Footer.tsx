@@ -4,7 +4,7 @@ import { Settings } from "lucide-react";
 export function Footer() {
   return (
     <footer className="bg-charcoal py-14 text-ivory/80">
-      <div className="section grid gap-10 md:grid-cols-3">
+      <div className="section grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <h3 className="font-heading text-2xl text-ivory">Sacred Hoof &amp; Hand</h3>
           <p className="mt-3 max-w-xs text-sm leading-relaxed text-ivory/60">
@@ -25,6 +25,13 @@ export function Footer() {
             {/* Placeholders — swap for real contact details */}
             <li><a href="mailto:sacredhoofandhand@gmail.com" className="hover:text-gold">sacredhoofandhand@gmail.com</a></li>
             <li><span>Serving virtually &amp; locally</span></li>
+          </ul>
+        </div>
+        <div className="text-sm">
+          <p className="mb-3 font-semibold uppercase tracking-wide text-gold">Legal</p>
+          <ul className="space-y-2 text-ivory/70">
+            <li><Link href="/terms" className="hover:text-gold">Terms of Service</Link></li>
+            <li><Link href="/liability-waiver" className="hover:text-gold">Liability Waiver</Link></li>
           </ul>
         </div>
       </div>

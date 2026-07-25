@@ -70,7 +70,7 @@ export const DEFAULT_SERVICES: Service[] = [
 ];
 
 /**
- * Limited-time FREE intro session promotion.
+ * FREE intro session promotion.
  *
  * To REMOVE the offer entirely, set `enabled: false` (the banner disappears and
  * it stops being bookable). You can also let it auto-expire by setting
@@ -81,14 +81,12 @@ export const FREE_SESSION_OFFER = {
   /** Set to an ISO date string (e.g. "2026-07-31") to auto-expire, or null for no end date. */
   endsOn: null as string | null,
   /** Small label shown on the badge. */
-  badge: "Limited time · Free",
-  /** Allow only one free session per email address (best-effort, needs Supabase). */
-  onePerClient: true,
+  badge: "Complimentary · 20 minutes",
   service: {
     id: "free-intro",
     name: "Complimentary Intro Session",
     description:
-      "New here? Enjoy your first Reiki session on the house — a gentle 20-minute introduction to experience the practice and feel into what resonates. No payment needed.",
+      "Enjoy a gentle 20-minute Reiki session on the house to experience the practice and feel into what resonates. Come back for another complimentary intro whenever you would like. No payment needed.",
     durationMinutes: 20,
     priceCents: 0,
     location: "both" as const,
