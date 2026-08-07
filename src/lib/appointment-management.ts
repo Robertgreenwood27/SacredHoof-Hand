@@ -6,6 +6,7 @@ import {
 } from "./email";
 import { env } from "./env";
 import { expirePendingBookingHolds, hashManageToken } from "./booking";
+import { getServiceById } from "./data";
 import { validateRequestedSlot } from "./slot-validation";
 import type { Appointment, BookingAgreement } from "./types";
 
@@ -36,6 +37,7 @@ function appointmentEmailInput(
     appointment_id: appointment.id,
     client_name: appointment.client_name,
     client_email: appointment.client_email,
+    service_id: appointment.service_id,
     service_name: appointment.service_name,
     starts_at: appointment.starts_at,
     ends_at: appointment.ends_at,
@@ -121,8 +123,16 @@ export async function rescheduleAppointment(
     );
   }
 
+  // Reschedules stay inside the programme the session was booked from — a
+  // horse session may only move to another scheduled horse slot.
+  const service = existing.service_id
+    ? await getServiceById(existing.service_id)
+    : null;
   const slot = await validateRequestedSlot({
-    service: { durationMinutes: durationMinutes(existing) },
+    service: {
+      durationMinutes: durationMinutes(existing),
+      kind: service?.kind ?? "standard",
+    },
     startsAt,
     endsAt,
     excludeAppointmentId: existing.id,

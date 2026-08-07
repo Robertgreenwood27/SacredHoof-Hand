@@ -7,8 +7,9 @@ import {
   getAvailabilityRules,
   getBookedAppointments,
   getBlockedDays,
+  getEventSlots,
 } from "@/lib/data";
-import { generateDayGrid } from "@/lib/scheduling";
+import { generateDayGrid, generateEventGrid } from "@/lib/scheduling";
 import { BUSINESS_TIMEZONE, BOOKING_LEAD_HOURS } from "@/lib/content";
 import { CURRENT_AGREEMENT_EVIDENCE } from "@/lib/agreements";
 import { addDays } from "date-fns";
@@ -21,10 +22,11 @@ export default async function BookPage({
   searchParams: Promise<{ service?: string }>;
 }) {
   const { service: preselect } = await searchParams;
-  const [services, rules, blockedDays] = await Promise.all([
+  const [services, rules, blockedDays, eventSlots] = await Promise.all([
     getServices(),
     getAvailabilityRules(),
     getBlockedDays(),
+    getEventSlots("equine"),
   ]);
 
   const now = new Date();
@@ -38,17 +40,30 @@ export default async function BookPage({
   // We emit a flat list of UTC instants; the client groups + labels them in the
   // visitor's own timezone (slots are authored in Mountain, but each is stored
   // as a timezone-neutral instant, so a Texas visitor sees Central time).
+  //
+  // Horse sessions only exist on the scheduled event dates, so they are built
+  // from that dated list rather than the weekly rules — but against the same
+  // booked-appointment set, so the two schedules can never sell one hour twice.
   const slotsByService = Object.fromEntries(
     services.map((s) => [
       s.id,
-      generateDayGrid({
-        rules,
-        booked,
-        blockedDays: blockedDayKeys,
-        durationMinutes: s.durationMinutes,
-        timeZone: BUSINESS_TIMEZONE,
-        leadHours: BOOKING_LEAD_HOURS,
-      }).flatMap((d) => d.slots),
+      s.kind === "equine"
+        ? generateEventGrid({
+            slots: eventSlots,
+            booked,
+            blockedDays: blockedDayKeys,
+            durationMinutes: s.durationMinutes,
+            timeZone: BUSINESS_TIMEZONE,
+            leadHours: BOOKING_LEAD_HOURS,
+          }).flatMap((d) => d.slots)
+        : generateDayGrid({
+            rules,
+            booked,
+            blockedDays: blockedDayKeys,
+            durationMinutes: s.durationMinutes,
+            timeZone: BUSINESS_TIMEZONE,
+            leadHours: BOOKING_LEAD_HOURS,
+          }).flatMap((d) => d.slots),
     ]),
   );
 

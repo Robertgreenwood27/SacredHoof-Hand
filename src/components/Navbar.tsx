@@ -23,8 +23,11 @@ export function Navbar({ onLight = false }: { onLight?: boolean }) {
           <Link href="/#services" className="hidden hover:text-gold sm:inline">
             Sessions
           </Link>
-          <Link href="/#vision" className="hidden hover:text-gold sm:inline">
-            Vision
+          <Link href="/#horses" className="hidden hover:text-gold sm:inline">
+            The Horses
+          </Link>
+          <Link href="/donate" className="hidden hover:text-gold sm:inline">
+            Donate
           </Link>
           <Link
             href="/book"

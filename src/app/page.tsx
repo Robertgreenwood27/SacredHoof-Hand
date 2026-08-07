@@ -1,6 +1,7 @@
 import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { ServicesSection } from "@/components/ServicesSection";
+import { EquineProgramSection } from "@/components/EquineProgramSection";
 import { VisionSection } from "@/components/VisionSection";
 import { FreeSessionBanner } from "@/components/FreeSessionBanner";
 import { Footer } from "@/components/Footer";
@@ -31,16 +32,20 @@ export default async function HomePage() {
 
       {freeActive && <FreeSessionBanner />}
       <ServicesSection services={services} />
+      <EquineProgramSection />
       <VisionSection />
 
       {/* Closing CTA */}
       <section className="bg-sage py-20">
         <div className="section text-center text-charcoal">
-          <h2 className="text-4xl md:text-5xl">Begin your journey to the known</h2>
+          <h2 className="text-4xl md:text-5xl">Come home to yourself</h2>
           <p className="mx-auto mt-4 max-w-xl text-lg font-light text-charcoal/80">
             Reconnect with balance, clarity, and inner peace — one session at a time.
           </p>
-          <a href="/book" className="btn-primary mt-8">Book Your Session</a>
+          <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <a href="/book" className="btn-primary">Book Your Session</a>
+            <a href="/donate" className="btn-secondary">Support the horses</a>
+          </div>
         </div>
       </section>
 

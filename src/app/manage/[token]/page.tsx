@@ -10,7 +10,11 @@ import {
   getAppointmentByManageToken,
 } from "@/lib/appointment-management";
 import { getRescheduleSlots } from "@/lib/slot-validation";
-import { BUSINESS_TIMEZONE } from "@/lib/content";
+import {
+  BUSINESS_TIMEZONE,
+  EQUINE_LOCATION,
+  isEquineServiceId,
+} from "@/lib/content";
 import {
   cancelClientAppointment,
   rescheduleClientAppointment,
@@ -110,6 +114,34 @@ export default async function ManageAppointmentPage({
           displayTimeZone={appointment.client_timezone || BUSINESS_TIMEZONE}
           viewer="client"
         />
+
+        {/* The property is private — shown only here, behind the booking token,
+            and never on a public page. */}
+        {isEquineServiceId(appointment.service_id) &&
+          appointment.status !== "cancelled" && (
+            <section className="mt-8 rounded-2xl border border-gold/50 bg-gold/10 p-6">
+              <h2 className="text-2xl">Where to meet us</h2>
+              <p className="mt-3 font-heading text-xl text-charcoal">
+                {EQUINE_LOCATION.address}
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-charcoal/75">
+                {EQUINE_LOCATION.directions}
+              </p>
+              <p className="mt-3 text-sm leading-relaxed text-charcoal/75">
+                {EQUINE_LOCATION.arrival}
+              </p>
+              <a
+                href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                  EQUINE_LOCATION.address,
+                )}`}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="mt-4 inline-block text-sm font-semibold text-terracotta underline"
+              >
+                Open in maps
+              </a>
+            </section>
+          )}
 
         <section className="mt-8 rounded-2xl border border-sage/40 bg-white/75 p-6">
           <h2 className="text-2xl">Your signed agreement record</h2>

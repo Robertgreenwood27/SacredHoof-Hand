@@ -1,7 +1,13 @@
 import { Resend } from "resend";
 import { formatInTimeZone } from "date-fns-tz";
 import { env, emailConfigured } from "./env";
-import { priceLabel, AFTERCARE, BUSINESS_TIMEZONE } from "./content";
+import {
+  priceLabel,
+  AFTERCARE,
+  BUSINESS_TIMEZONE,
+  EQUINE_LOCATION,
+  isEquineServiceId,
+} from "./content";
 import { isValidEmail } from "./validation";
 import type { Appointment } from "./types";
 
@@ -18,6 +24,8 @@ export type AppointmentEmailInput = Pick<
   | "notes"
   | "client_timezone"
 > & {
+  /** Decides whether the private herd-day address is included. */
+  service_id?: string | null;
   /** Database id used to make provider retries idempotent. */
   appointment_id?: string;
   /** Opaque client self-service link, when one has been issued. */
@@ -140,6 +148,24 @@ function notesRow(notes: string | null): string {
   return notes ? row("Notes", escapeMultilineHtml(notes)) : "";
 }
 
+/**
+ * The herd-day address block. The property is private, so it appears nowhere
+ * public — only in email to someone who already holds a confirmed booking.
+ * Returns an empty string for every non-equine session.
+ */
+function equineLocationBlock(appt: AppointmentEmailInput): string {
+  if (!isEquineServiceId(appt.service_id)) return "";
+
+  return `
+    <div style="margin:24px 0; padding:20px 22px; background:#F7F3EC; border-left:3px solid #A8B2A1; border-radius:8px;">
+      <p style="margin:0 0 8px; font-family:Georgia,serif; font-size:17px; color:#3A3A3A;">Where to meet us</p>
+      <p style="margin:0 0 10px; font-size:15px; color:#3A3A3A;"><strong>${escapeHtml(EQUINE_LOCATION.address)}</strong></p>
+      <p style="margin:0 0 10px; color:#5c5850; font-size:14px; line-height:1.6;">${escapeHtml(EQUINE_LOCATION.directions)}</p>
+      <p style="margin:0; color:#5c5850; font-size:14px; line-height:1.6;">${escapeHtml(EQUINE_LOCATION.arrival)}</p>
+    </div>
+  `;
+}
+
 function manageBookingLink(appt: AppointmentEmailInput): string {
   const manageUrl = normalizeManageUrl(appt.manage_url);
   if (!manageUrl) return "";
@@ -181,6 +207,7 @@ export function buildBookingEmails(
       ${textRow("When", whenClient)}
       ${textRow("Paid", priceLabel(appt.amount_cents))}
     </table>
+    ${equineLocationBlock(appt)}
     ${manageBookingLink(appt)}
     <p>Take a few moments before our time together to settle in and set an intention. I look forward to holding space for you.</p>
 
@@ -224,6 +251,7 @@ function buildAppointmentChangedEmails(
       ${textRow("When", whenClient)}
       ${textRow("Paid", priceLabel(appt.amount_cents))}
     </table>
+    ${equineLocationBlock(appt)}
     ${manageBookingLink(appt)}
     <p>If this new time does not work for you, please manage your booking or reply to this email.</p>
     <p>With warmth,<br/>Sacred Hoof &amp; Hand</p>
@@ -292,6 +320,7 @@ function buildReminderEmails(
       ${textRow("Service", appt.service_name)}
       ${textRow("When", whenClient)}
     </table>
+    ${equineLocationBlock(appt)}
     ${manageBookingLink(appt)}
     <p>Take a few moments beforehand to settle in and set an intention. I look forward to our time together.</p>
     <p>With warmth,<br/>Sacred Hoof &amp; Hand</p>

@@ -8,9 +8,9 @@ export function VisionSection() {
           <p className="eyebrow">The growing dream</p>
           <h2 className="mt-3 text-4xl md:text-5xl">A larger vision of holistic healing</h2>
           <p className="mt-5 text-lg font-light leading-relaxed text-charcoal/75">
-            Sacred Hoof &amp; Hand is growing toward a larger vision of holistic
-            healing that includes horse-assisted Reiki, sound healing experiences,
-            and retreat offerings.
+            Reiki with the horses is here. Sacred Hoof &amp; Hand keeps growing
+            toward the rest of the vision — sound healing experiences and
+            retreat offerings held on the same land.
           </p>
           <p className="mt-4 text-lg font-light leading-relaxed text-charcoal/75">
             While those services are not yet available, they remain a foundational

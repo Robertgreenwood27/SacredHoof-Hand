@@ -8,7 +8,6 @@ import {
   cancelAppointment,
   rescheduleAppointment,
 } from "@/lib/appointment-management";
-import { BOOKING_PROMOTION_PERCENTAGES } from "@/lib/promotion";
 import type { AppointmentStatus } from "@/lib/types";
 
 /**
@@ -189,18 +188,16 @@ export async function unblockDay(day: string) {
   revalidatePath("/book");
 }
 
-export async function setPromotionEnabled(
-  discountPercent: number,
-  enabled: boolean,
-) {
+/**
+ * Codes are identified by the code itself, not by their percentage — two
+ * promotions can share a discount when they are scoped to different sessions
+ * (a site-wide 20% and the horse-only 20%).
+ */
+export async function setPromotionEnabled(code: string, enabled: boolean) {
   if (typeof enabled !== "boolean") {
     throw new Error("The promotion status is invalid.");
   }
-  if (
-    !BOOKING_PROMOTION_PERCENTAGES.includes(
-      discountPercent as (typeof BOOKING_PROMOTION_PERCENTAGES)[number],
-    )
-  ) {
+  if (typeof code !== "string" || !code.trim()) {
     throw new Error("That promotion cannot be changed.");
   }
 
@@ -211,8 +208,8 @@ export async function setPromotionEnabled(
       enabled,
       updated_at: new Date().toISOString(),
     })
-    .eq("discount_percent", discountPercent)
-    .select("discount_percent")
+    .eq("code", code)
+    .select("code")
     .maybeSingle();
 
   if (error) throw new Error(error.message);

@@ -125,9 +125,30 @@ export function BookingClient({
 
   const service = services.find((s) => s.id === serviceId) ?? services[0];
   const isFree = service?.priceCents === 0;
+  const isEquine = service?.kind === "equine";
   const grid = useMemo(
     () => groupByLocalDay(slotsByService[serviceId ?? ""] ?? []),
     [slotsByService, serviceId],
+  );
+  // Sessions are grouped so the horse days read as their own programme rather
+  // than as three more line items.
+  const serviceGroups = useMemo(
+    () =>
+      [
+        {
+          key: "standard" as const,
+          heading: "Reiki with Shelby",
+          note: "Virtual or in person · founding rates",
+          items: services.filter((s) => s.kind !== "equine"),
+        },
+        {
+          key: "equine" as const,
+          heading: "Reiki with Shelby + horses",
+          note: "On the land in Fairplay, CO · founding rates",
+          items: services.filter((s) => s.kind === "equine"),
+        },
+      ].filter((group) => group.items.length > 0),
+    [services],
   );
   const tzAbbr = useMemo(() => (mounted ? localTzAbbr() : ""), [mounted]);
   const selectedDay = grid.find((d) => d.dateKey === dateKey);
@@ -230,6 +251,14 @@ export function BookingClient({
     (isFree || !promoCode.trim() || Boolean(promotion)) &&
     !submitting;
   const anyAvailability = grid.some((d) => d.hasAvailable);
+  // No slots at all means this length is not on the schedule; slots that exist
+  // but are all taken is a different message.
+  const neverScheduled = grid.length === 0;
+  const emptyMessage = isEquine
+    ? neverScheduled
+      ? `${service?.durationMinutes}-minute sessions with the horses are not on the current herd-day schedule. Email us and we will arrange one for you.`
+      : "Every slot on the scheduled herd days is booked. Email us to be told about the next one."
+    : "No open times in the next few weeks. Please check back soon or reach out directly.";
 
   return (
     <div className="section grid min-w-0 gap-8 py-10 sm:py-12 lg:grid-cols-[minmax(0,1fr)_minmax(17rem,21rem)] lg:gap-8 lg:py-16 xl:gap-10">
@@ -237,29 +266,52 @@ export function BookingClient({
         {/* Step 1: choose a service */}
         <section>
           <h2 className="mb-4 text-2xl">1 · Choose your session</h2>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {services.map((s) => (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setServiceId(s.id)}
-                aria-pressed={s.id === serviceId}
-                className={`rounded-2xl border p-5 text-left transition ${
-                  s.id === serviceId
-                    ? "border-terracotta bg-terracotta/10 ring-1 ring-terracotta"
-                    : "border-sage/40 bg-white/60 hover:border-sage"
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-heading text-xl">{s.name}</span>
-                  {s.id === serviceId && <Check className="h-5 w-5 text-terracotta" />}
+          <div className="space-y-6">
+            {serviceGroups.map((group) => (
+              <div key={group.key}>
+                <div className="mb-3">
+                  <h3 className="font-heading text-xl text-charcoal">
+                    {group.heading}
+                  </h3>
+                  <p className="text-xs uppercase tracking-wide text-charcoal/50">
+                    {group.note}
+                  </p>
                 </div>
-                <p className="mt-1 text-sm text-charcoal/60">
-                  {s.durationMinutes} min · {priceLabel(s.priceCents)}
-                </p>
-              </button>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {group.items.map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setServiceId(s.id)}
+                      aria-pressed={s.id === serviceId}
+                      className={`rounded-2xl border p-5 text-left transition ${
+                        s.id === serviceId
+                          ? "border-terracotta bg-terracotta/10 ring-1 ring-terracotta"
+                          : "border-sage/40 bg-white/60 hover:border-sage"
+                      }`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <span className="font-heading text-xl">{s.name}</span>
+                        {s.id === serviceId && (
+                          <Check className="h-5 w-5 text-terracotta" />
+                        )}
+                      </div>
+                      <p className="mt-1 text-sm text-charcoal/60">
+                        {s.durationMinutes} min · {priceLabel(s.priceCents)}
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
+          {isEquine && (
+            <p className="mt-4 rounded-xl border border-gold/40 bg-gold/10 p-4 text-sm leading-relaxed text-charcoal/75">
+              Sessions with the horses happen on scheduled herd days in
+              Fairplay, Colorado. The exact address and parking directions are
+              sent to you as soon as your booking is confirmed.
+            </p>
+          )}
         </section>
 
         {/* Step 2: pick a time */}
@@ -276,9 +328,14 @@ export function BookingClient({
               Loading available times…
             </p>
           ) : !anyAvailability ? (
-            <p className="rounded-xl border border-sage/40 bg-white/60 p-5 text-sm text-charcoal/60">
-              No open times in the next few weeks. Please check back soon or reach
-              out directly.
+            <p className="rounded-xl border border-sage/40 bg-white/60 p-5 text-sm leading-relaxed text-charcoal/60">
+              {emptyMessage}{" "}
+              <a
+                href="mailto:sacredhoofandhand@gmail.com"
+                className="font-semibold text-terracotta underline"
+              >
+                sacredhoofandhand@gmail.com
+              </a>
             </p>
           ) : (
             <>

@@ -1,6 +1,6 @@
 import { addDays, addMinutes } from "date-fns";
 import { fromZonedTime, toZonedTime, formatInTimeZone } from "date-fns-tz";
-import type { AvailabilityRule } from "./types";
+import type { AvailabilityRule, EventSlot } from "./types";
 
 /** One time option in the picker. `available` controls whether it's selectable. */
 export type GridSlot = {
@@ -120,6 +120,78 @@ export function generateDayGrid({
   }
 
   return days;
+}
+
+type EventGridArgs = {
+  /** Every scheduled slot for this programme, of any length. */
+  slots: Pick<EventSlot, "day" | "start_time" | "duration_minutes">[];
+  booked: { starts_at: string; ends_at: string }[];
+  blockedDays?: string[];
+  /** Only slots scheduled for exactly this length are offered. */
+  durationMinutes: number;
+  timeZone: string;
+  leadHours?: number;
+};
+
+/**
+ * Builds the booking grid for an event-based programme (the horse days), where
+ * availability is a fixed list of specific start times on specific dates rather
+ * than a weekly pattern.
+ *
+ * Unlike the weekly grid this does NOT slide a window across open hours: each
+ * scheduled slot is offered exactly as authored, so a 60-minute slot is never
+ * sold as two 30-minute sessions and the gaps between slots stay reserved for
+ * settling the herd. Slots in the past, inside the lead-time cutoff, on a
+ * blocked day, or already booked are kept but marked unavailable so the UI can
+ * grey them out.
+ */
+export function generateEventGrid({
+  slots,
+  booked,
+  blockedDays = [],
+  durationMinutes,
+  timeZone,
+  leadHours = 12,
+}: EventGridArgs): DayGrid[] {
+  const blocked = new Set(blockedDays);
+  const earliest = addMinutes(new Date(), leadHours * 60);
+
+  const byDay = new Map<string, GridSlot[]>();
+  const matching = slots
+    .filter((slot) => slot.duration_minutes === durationMinutes)
+    .filter((slot) => !blocked.has(slot.day));
+
+  for (const slot of matching) {
+    const startUtc = fromZonedTime(`${slot.day}T${slot.start_time}:00`, timeZone);
+    if (!Number.isFinite(startUtc.getTime())) continue;
+    const endUtc = addMinutes(startUtc, slot.duration_minutes);
+
+    const conflicts = booked.some((b) =>
+      overlaps(startUtc, endUtc, new Date(b.starts_at), new Date(b.ends_at)),
+    );
+
+    const day = byDay.get(slot.day) ?? [];
+    day.push({
+      startsAt: startUtc.toISOString(),
+      endsAt: endUtc.toISOString(),
+      label: formatInTimeZone(startUtc, timeZone, "h:mm a"),
+      available: !conflicts && startUtc > earliest,
+    });
+    byDay.set(slot.day, day);
+  }
+
+  return [...byDay.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([dateKey, daySlots]) => {
+      const noon = fromZonedTime(`${dateKey}T12:00:00`, timeZone);
+      return {
+        dateKey,
+        dayLabel: formatInTimeZone(noon, timeZone, "EEEE, MMMM d"),
+        shortLabel: formatInTimeZone(noon, timeZone, "EEE d"),
+        slots: daySlots.sort((a, b) => a.startsAt.localeCompare(b.startsAt)),
+        hasAvailable: daySlots.some((s) => s.available),
+      };
+    });
 }
 
 function overlaps(aStart: Date, aEnd: Date, bStart: Date, bEnd: Date): boolean {

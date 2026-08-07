@@ -1,4 +1,4 @@
-import type { HeroContent, Service } from "./types";
+import type { EventSlot, HeroContent, Service, SessionKind } from "./types";
 
 /**
  * The practitioner's timezone. Availability hours are AUTHORED in this zone and
@@ -24,50 +24,150 @@ export const BOOKING_LEAD_HOURS = 2;
  * shown before anything is customized or if Supabase isn't configured yet.
  */
 export const DEFAULT_HERO: HeroContent = {
-  eyebrow: "Reiki · Presence · Compassionate Connection",
-  title: "Journey to the Known",
+  eyebrow: "Reiki · Horses · Sacred Sanctuary",
+  title: "Reconnect. Restore. Remember.",
   subtitle:
-    "Virtual and in-person Reiki sessions designed to help you reconnect with balance, clarity, and inner peace.",
+    "Reiki with Shelby — virtual, in person, and out in the field alongside the horses. A quiet place to set down what you are carrying and remember who you are.",
   ctaLabel: "Book Your Session",
   imageUrl: "/horse-hero.webp",
 };
 
 /**
- * Starter service catalog. Swap pricing/durations freely — these also seed the
- * Stripe Checkout amounts. Prices are in cents (USD).
+ * Service catalog. Prices are in cents (USD) and seed the Stripe Checkout
+ * amounts. `kind` decides how a session is scheduled: `standard` sessions use
+ * the weekly availability rules, `equine` sessions are only offered on the
+ * dates in `DEFAULT_EVENT_SLOTS` / the `event_slots` table.
+ *
+ * These are the founding rates. Production reads the `services` table, so
+ * changing a price here also needs the matching update in supabase/schema.sql.
  */
 export const DEFAULT_SERVICES: Service[] = [
   {
-    id: "virtual-reiki",
-    name: "Virtual Reiki Session",
+    id: "reiki-30",
+    name: "30-Minute Reiki",
     description:
-      "A distance Reiki session from the comfort of your own space. We connect over video to set intentions, then move into guided energy work.",
-    durationMinutes: 60,
-    priceCents: 9000,
-    location: "virtual",
-    active: true,
-  },
-  {
-    id: "in-person-reiki",
-    name: "In-Person Reiki Session",
-    description:
-      "A hands-on, in-person Reiki session in a calm, grounded setting designed to help you release tension and reconnect with balance.",
-    durationMinutes: 75,
-    priceCents: 12000,
-    location: "in-person",
-    active: true,
-  },
-  {
-    id: "intro-reiki",
-    name: "Intro Mini Session",
-    description:
-      "New to Reiki? A shorter session to experience the practice and feel into what resonates before committing to a full session.",
+      "A focused half-hour of energy work — enough to settle the nervous system, release what you are holding, and come back to center.",
     durationMinutes: 30,
-    priceCents: 5000,
+    priceCents: 3300,
     location: "both",
+    kind: "standard",
+    active: true,
+  },
+  {
+    id: "reiki-60",
+    name: "60-Minute Reiki",
+    description:
+      "The full session. We begin by setting intentions together, then move into unhurried Reiki with time afterward to land before you go back out into your day.",
+    durationMinutes: 60,
+    priceCents: 5500,
+    location: "both",
+    kind: "standard",
+    active: true,
+  },
+  {
+    id: "reiki-90",
+    name: "90-Minute Reiki",
+    description:
+      "A longer, deeper session for when you need more room — space to work slowly through what has been stored, without watching the clock.",
+    durationMinutes: 90,
+    priceCents: 11100,
+    location: "both",
+    kind: "standard",
+    active: true,
+  },
+  {
+    id: "equine-30",
+    name: "30 Minutes with the Horses",
+    description:
+      "A half hour of Reiki in the field alongside the herd. Horses regulate the people around them — being near them does part of the work before the session even begins.",
+    durationMinutes: 30,
+    priceCents: 7700,
+    location: "in-person",
+    kind: "equine",
+    active: true,
+  },
+  {
+    id: "equine-60",
+    name: "60 Minutes with the Horses",
+    description:
+      "An hour of equine-assisted Reiki. Time to meet the herd, let your body settle into their pace, and receive energy work in their presence.",
+    durationMinutes: 60,
+    priceCents: 9900,
+    location: "in-person",
+    kind: "equine",
+    active: true,
+  },
+  {
+    id: "equine-90",
+    name: "90 Minutes with the Horses",
+    description:
+      "The longest session on the land. Unhurried time with the herd — enough that the horses stop reading you as a visitor and the work can go somewhere deeper.",
+    durationMinutes: 90,
+    priceCents: 11100,
+    location: "in-person",
+    kind: "equine",
     active: true,
   },
 ];
+
+/** Service ids whose sessions happen out at the herd. */
+export function isEquineServiceId(serviceId: string | null | undefined): boolean {
+  if (!serviceId) return false;
+  const service = DEFAULT_SERVICES.find((s) => s.id === serviceId);
+  if (service) return service.kind === "equine";
+  // Services added later in Supabase follow the same id convention.
+  return serviceId.startsWith("equine-");
+}
+
+/**
+ * The horse days. Equine sessions are NOT offered on the weekly schedule —
+ * each row below is one specific bookable start time on one specific date, in
+ * the business timezone, and a slot can only be booked by a service of exactly
+ * that length. Add a date here (and in supabase/schema.sql) to open more.
+ */
+export const DEFAULT_EVENT_SLOTS: Omit<EventSlot, "id">[] = [
+  "2026-08-16",
+  "2026-08-23",
+].flatMap((day) =>
+  (
+    [
+      // The 60 and the 90 at each of these two starts are ALTERNATIVES, not
+      // extra capacity: they overlap, so booking either one removes the other
+      // from the calendar. Each 90 uses only the buffer that already followed
+      // its 60 (08:00 ends at 09:30, 09:30 ends at 11:00), so choosing the
+      // longer session never moves anything later in the day.
+      ["08:00", 60],
+      ["08:00", 90],
+      ["09:30", 60],
+      ["09:30", 90],
+      ["11:00", 30],
+      ["12:00", 60],
+      ["13:40", 60],
+      ["15:00", 30],
+    ] as const
+  ).map(([start_time, duration_minutes]) => ({
+    session_kind: "equine" as SessionKind,
+    day,
+    start_time,
+    duration_minutes,
+  })),
+);
+
+/**
+ * Where the horse sessions happen. This is a private property, so it is only
+ * shown after a booking is confirmed — the manage-booking page, the
+ * confirmation email, and the reminder email. Never render it on a public page.
+ */
+export const EQUINE_LOCATION = {
+  name: "Sacred Hoof & Hand — Fairplay",
+  address: "186 Wooly Worm Ln, Fairplay, CO 80440",
+  /** Shown publicly in place of the street address. */
+  publicLabel: "Fairplay, Colorado",
+  directions:
+    "Pull straight down the entrance, then veer left and park up by the red indoor arena, in front of the horse trailers.",
+  arrival:
+    "Come as you are, in clothes and closed-toe shoes you do not mind getting dusty. Arriving ten minutes early gives you time to meet the herd before we begin.",
+};
 
 /**
  * FREE intro session promotion.
@@ -90,6 +190,7 @@ export const FREE_SESSION_OFFER = {
     durationMinutes: 20,
     priceCents: 0,
     location: "both" as const,
+    kind: "standard" as SessionKind,
     active: true,
   },
 };
@@ -106,11 +207,6 @@ export function isFreeSessionActive(): boolean {
 /** Services that are part of the future vision (shown but not yet bookable). */
 export const FUTURE_OFFERINGS = [
   {
-    title: "Horse-Assisted Reiki",
-    description:
-      "Energy work alongside horses — partners whose presence invites deep regulation, trust, and embodied healing.",
-  },
-  {
     title: "Sound Healing",
     description:
       "Immersive sound experiences that use vibration and resonance to quiet the mind and restore the nervous system.",
@@ -121,6 +217,52 @@ export const FUTURE_OFFERINGS = [
       "Multi-day gatherings woven from Reiki, ritual, and nature — space to slow down and remember yourself.",
   },
 ];
+
+/**
+ * The equine programme's mission. The nonprofit filing is in progress, so this
+ * copy says "nonprofit in formation" and makes no claim about tax-deductible
+ * gifts — see DONATION.disclaimer. Update both once the IRS determination
+ * letter arrives.
+ */
+export const EQUINE_PROGRAM = {
+  eyebrow: "A nonprofit in formation",
+  title: "Where the horses do the teaching",
+  lead:
+    "The horse programme at Sacred Hoof & Hand is being organized as a nonprofit — holistic ecological connection alongside equine-assisted wellness, on land shared with the herd.",
+  body:
+    "Horses read what we carry before we have language for it. Standing with them slows the breath and softens the guard, and Reiki meets people in that opening. What the sessions raise goes back into the horses' care and into keeping this work available to the people who need it.",
+  pillars: [
+    {
+      title: "Stress reduction",
+      description:
+        "Time alongside the herd settles an overworked nervous system. Reiki deepens that regulation into something you can carry home.",
+    },
+    {
+      title: "Animal rehabilitation",
+      description:
+        "Horses arrive here needing their own healing. Gentle handling, patient rehabilitation, and a herd that teaches them safety again.",
+    },
+    {
+      title: "Alternative wellness",
+      description:
+        "Reiki, presence, and ecological connection as a complement to the care you already receive — never a replacement for it.",
+    },
+  ],
+};
+
+/**
+ * Donation configuration. Amounts are USD cents. Because the nonprofit
+ * application has not yet been determined, the copy must not promise
+ * tax deductibility.
+ */
+export const DONATION = {
+  minCents: 500,
+  maxCents: 1_000_000,
+  presetsCents: [2500, 5000, 11100, 25000],
+  defaultCents: 5000,
+  disclaimer:
+    "Sacred Hoof & Hand's equine programme is in the process of applying for nonprofit status. Gifts are not tax-deductible at this time, and we will say so plainly here the moment that changes.",
+};
 
 /**
  * Aftercare guidance included in the client's confirmation email. Edit the

@@ -136,6 +136,7 @@ async function sendToRecipient(
       appointment_id: appointment.id,
       client_name: appointment.client_name,
       client_email: appointment.client_email,
+      service_id: appointment.service_id,
       service_name: appointment.service_name,
       starts_at: appointment.starts_at,
       ends_at: appointment.ends_at,

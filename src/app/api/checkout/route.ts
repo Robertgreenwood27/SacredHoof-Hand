@@ -211,7 +211,7 @@ export async function POST(req: Request) {
 
   let promotion;
   try {
-    promotion = await applyBookingPromotion(body.promoCode, service.priceCents);
+    promotion = await applyBookingPromotion(body.promoCode, service);
   } catch (error) {
     return NextResponse.json(
       { error: error instanceof Error ? error.message : "Invalid discount code." },

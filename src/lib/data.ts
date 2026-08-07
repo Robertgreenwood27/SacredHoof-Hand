@@ -4,6 +4,7 @@ import {
   createSupabaseAdminClient,
 } from "./supabase/server";
 import {
+  DEFAULT_EVENT_SLOTS,
   DEFAULT_HERO,
   DEFAULT_SERVICES,
   FREE_SESSION_OFFER,
@@ -12,8 +13,10 @@ import {
 import type {
   AvailabilityRule,
   BlockedDay,
+  EventSlot,
   HeroContent,
   Service,
+  SessionKind,
   Appointment,
 } from "./types";
 
@@ -83,6 +86,8 @@ export async function getServices(): Promise<Service[]> {
     durationMinutes: s.duration_minutes,
     priceCents: s.price_cents,
     location: s.location,
+    // Databases that predate the equine programme have no session_kind column.
+    kind: (s.session_kind ?? "standard") as SessionKind,
     active: s.active,
   }));
 
@@ -92,6 +97,37 @@ export async function getServices(): Promise<Service[]> {
 export async function getServiceById(id: string): Promise<Service | null> {
   const services = await getServices();
   return services.find((s) => s.id === id) ?? null;
+}
+
+/**
+ * Explicitly scheduled event slots (the horse days). Unlike the weekly rules
+ * these are dated, so past rows are filtered out rather than repeating.
+ */
+export async function getEventSlots(
+  sessionKind: SessionKind = "equine",
+): Promise<EventSlot[]> {
+  const fallback = DEFAULT_EVENT_SLOTS.filter(
+    (slot) => slot.session_kind === sessionKind,
+  ).map((slot, index) => ({ id: `default-${index}`, ...slot }));
+
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) return isProduction ? [] : fallback;
+
+  const { data, error } = await supabase
+    .from("event_slots")
+    .select("id, session_kind, day, start_time, duration_minutes")
+    .eq("session_kind", sessionKind)
+    .order("day", { ascending: true })
+    .order("start_time", { ascending: true });
+
+  if (error) {
+    console.error("[event slots] could not load schedule", error);
+    return isProduction ? [] : fallback;
+  }
+  if (!data || data.length === 0) {
+    return isProduction ? [] : fallback;
+  }
+  return data as EventSlot[];
 }
 
 /** Weekly availability rules. Empty array if not configured. */

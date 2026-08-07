@@ -8,16 +8,78 @@ import {
   getAvailabilityRules,
   getBlockedDays,
   getBookedAppointments,
+  getEventSlots,
+  getServiceById,
 } from "./data";
-import { generateDayGrid, type GridSlot } from "./scheduling";
+import {
+  generateDayGrid,
+  generateEventGrid,
+  type GridSlot,
+} from "./scheduling";
 import type { Appointment, Service } from "./types";
 
 type SlotRequest = {
-  service: Pick<Service, "durationMinutes">;
+  service: Pick<Service, "durationMinutes" | "kind">;
   startsAt: string;
   endsAt: string;
   excludeAppointmentId?: string;
 };
+
+/**
+ * Rebuilds the offered slots for one service. Equine sessions come from the
+ * dated event schedule; everything else from the weekly availability rules.
+ * Both are checked against the same booked-appointment list, so a horse day
+ * and a virtual session can never be sold for the same hour.
+ */
+async function offeredSlots({
+  kind,
+  durationMinutes,
+  excludeAppointmentId,
+  from,
+  to,
+}: {
+  kind: Service["kind"];
+  durationMinutes: number;
+  excludeAppointmentId?: string;
+  from: Date;
+  to: Date;
+}): Promise<GridSlot[]> {
+  const daysAhead =
+    Math.ceil((to.getTime() - from.getTime()) / (24 * 60 * 60_000)) + 1;
+
+  const [blockedDays, booked] = await Promise.all([
+    getBlockedDays(),
+    getBookedAppointments(
+      from.toISOString(),
+      to.toISOString(),
+      excludeAppointmentId,
+    ),
+  ]);
+  const blockedDayKeys = blockedDays.map((day) => day.day);
+
+  if (kind === "equine") {
+    const slots = await getEventSlots("equine");
+    return generateEventGrid({
+      slots,
+      booked,
+      blockedDays: blockedDayKeys,
+      durationMinutes,
+      timeZone: BUSINESS_TIMEZONE,
+      leadHours: BOOKING_LEAD_HOURS,
+    }).flatMap((day) => day.slots);
+  }
+
+  const rules = await getAvailabilityRules();
+  return generateDayGrid({
+    rules,
+    booked,
+    blockedDays: blockedDayKeys,
+    durationMinutes,
+    timeZone: BUSINESS_TIMEZONE,
+    leadHours: BOOKING_LEAD_HOURS,
+    daysAhead,
+  }).flatMap((day) => day.slots);
+}
 
 export type SlotValidation =
   | { ok: true; startsAt: string; endsAt: string }
@@ -64,32 +126,19 @@ export async function validateRequestedSlot({
     };
   }
 
-  const [rules, blockedDays, booked] = await Promise.all([
-    getAvailabilityRules(),
-    getBlockedDays(),
-    getBookedAppointments(
-      now.toISOString(),
-      horizon.toISOString(),
-      excludeAppointmentId,
-    ),
-  ]);
-
   const normalizedStart = start.toISOString();
   const normalizedEnd = end.toISOString();
-  const candidate = generateDayGrid({
-    rules,
-    booked,
-    blockedDays: blockedDays.map((day) => day.day),
-    durationMinutes: service.durationMinutes,
-    timeZone: BUSINESS_TIMEZONE,
-    leadHours: BOOKING_LEAD_HOURS,
-    daysAhead: 31,
-  })
-    .flatMap((day) => day.slots)
-    .find(
-      (slot) =>
-        slot.startsAt === normalizedStart && slot.endsAt === normalizedEnd,
-    );
+  const candidate = (
+    await offeredSlots({
+      kind: service.kind,
+      durationMinutes: service.durationMinutes,
+      excludeAppointmentId,
+      from: now,
+      to: horizon,
+    })
+  ).find(
+    (slot) => slot.startsAt === normalizedStart && slot.endsAt === normalizedEnd,
+  );
 
   if (!candidate?.available) {
     return {
@@ -108,7 +157,7 @@ export async function validateRequestedSlot({
 export async function getRescheduleSlots(
   appointment: Pick<
     Appointment,
-    "id" | "starts_at" | "ends_at"
+    "id" | "service_id" | "starts_at" | "ends_at"
   >,
 ): Promise<GridSlot[]> {
   const durationMinutes = Math.round(
@@ -118,23 +167,17 @@ export async function getRescheduleSlots(
   );
   const now = new Date();
   const horizon = addDays(now, 31);
-  const [rules, blockedDays, booked] = await Promise.all([
-    getAvailabilityRules(),
-    getBlockedDays(),
-    getBookedAppointments(
-      now.toISOString(),
-      horizon.toISOString(),
-      appointment.id,
-    ),
-  ]);
+  // A horse session can only move to another horse slot, so offer the same
+  // programme's schedule the booking was made from.
+  const service = appointment.service_id
+    ? await getServiceById(appointment.service_id)
+    : null;
 
-  return generateDayGrid({
-    rules,
-    booked,
-    blockedDays: blockedDays.map((day) => day.day),
+  return offeredSlots({
+    kind: service?.kind ?? "standard",
     durationMinutes,
-    timeZone: BUSINESS_TIMEZONE,
-    leadHours: BOOKING_LEAD_HOURS,
-    daysAhead: 31,
-  }).flatMap((day) => day.slots);
+    excludeAppointmentId: appointment.id,
+    from: now,
+    to: horizon,
+  });
 }

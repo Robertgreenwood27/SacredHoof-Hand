@@ -39,6 +39,11 @@ export async function POST(req: Request) {
   ) {
     const session = event.data.object as Stripe.Checkout.Session;
     const meta = session.metadata ?? {};
+    // Donations carry no appointment. Without this guard they would fall into
+    // the legacy-booking branch below and fail forever on Stripe's retries.
+    if (meta.kind === "donation") {
+      return NextResponse.json({ received: true, donation: true });
+    }
     // Some delayed payment methods emit completed before funds settle. Wait
     // for async_payment_succeeded rather than confirming an unpaid session.
     if (

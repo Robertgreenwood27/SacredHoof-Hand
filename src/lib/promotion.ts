@@ -1,14 +1,19 @@
 import "server-only";
 import { env } from "./env";
 import { createSupabaseAdminClient } from "./supabase/server";
+import type { Service, SessionKind } from "./types";
 
-export const BOOKING_PROMOTION_PERCENTAGES = [20, 50, 85] as const;
-export type BookingPromotionPercent =
-  (typeof BOOKING_PROMOTION_PERCENTAGES)[number];
+/**
+ * Which sessions a code may be redeemed against. `all` is site-wide; `equine`
+ * restricts the code to the horse programme.
+ */
+export type PromotionScope = "all" | "equine";
 
 export type BookingPromotion = {
-  discountPercent: BookingPromotionPercent;
+  /** Stable identity of a promotion — codes are matched case-insensitively. */
   code: string;
+  discountPercent: number;
+  appliesTo: PromotionScope;
   enabled: boolean;
 };
 
@@ -29,13 +34,29 @@ export type PromotionResult = {
 export class PromotionConfigurationError extends Error {}
 
 const DEFAULT_BOOKING_PROMOTIONS: BookingPromotion[] = [
-  { discountPercent: 20, code: "SACRED20", enabled: true },
-  { discountPercent: 50, code: "SACRED50", enabled: true },
-  { discountPercent: 85, code: "SACRED85", enabled: true },
+  { code: "SACRED20", discountPercent: 20, appliesTo: "all", enabled: true },
+  { code: "SACRED50", discountPercent: 50, appliesTo: "all", enabled: true },
+  { code: "SACRED85", discountPercent: 85, appliesTo: "all", enabled: true },
+  {
+    code: "#rescue&reiki",
+    discountPercent: 20,
+    appliesTo: "equine",
+    enabled: true,
+  },
 ];
+
+/** Human-readable description of what a scope covers. */
+export const PROMOTION_SCOPE_LABEL: Record<PromotionScope, string> = {
+  all: "Every session",
+  equine: "Horse sessions only",
+};
 
 function normalizeCode(code: string): string {
   return code.trim().toLocaleUpperCase("en-US");
+}
+
+function scopeCovers(scope: PromotionScope, kind: SessionKind): boolean {
+  return scope === "all" || scope === kind;
 }
 
 /**
@@ -52,9 +73,12 @@ export async function getBookingPromotionConfiguration(): Promise<BookingPromoti
     };
   }
 
+  // `select("*")` rather than naming applies_to: a database that has not run
+  // the latest schema yet has no such column, and naming it would fail the
+  // whole query and take every discount code offline until the migration runs.
   const { data, error } = await supabase
     .from("booking_promotions")
-    .select("discount_percent, code, enabled")
+    .select("*")
     .order("discount_percent", { ascending: true });
 
   if (error) {
@@ -67,8 +91,10 @@ export async function getBookingPromotionConfiguration(): Promise<BookingPromoti
 
   return {
     promotions: (data ?? []).map((promotion) => ({
-      discountPercent: promotion.discount_percent as BookingPromotionPercent,
       code: promotion.code,
+      discountPercent: promotion.discount_percent,
+      // Databases predating scoped codes treat every code as site-wide.
+      appliesTo: (promotion.applies_to ?? "all") as PromotionScope,
       enabled: promotion.enabled,
     })),
     persisted: true,
@@ -76,14 +102,16 @@ export async function getBookingPromotionConfiguration(): Promise<BookingPromoti
 }
 
 /**
- * Validates an enabled booking code and calculates the server-owned total. The
- * browser never supplies a discount or amount, so request tampering cannot
- * change the price.
+ * Validates an enabled booking code against the session it is being applied to
+ * and calculates the server-owned total. The browser never supplies a discount
+ * or amount, so request tampering cannot change the price — and a code scoped
+ * to the horse programme is rejected here, not just hidden in the UI.
  */
 export async function applyBookingPromotion(
   submittedCode: string | undefined,
-  originalAmountCents: number,
+  service: Pick<Service, "priceCents" | "kind">,
 ): Promise<PromotionResult> {
+  const originalAmountCents = service.priceCents;
   const code = submittedCode?.trim() ?? "";
   if (!code) {
     return {
@@ -111,17 +139,25 @@ export async function applyBookingPromotion(
 
   // Keep a previously configured private 50% code working as an alias, while
   // still honoring the dashboard's enabled/disabled state for the 50% offer.
-  if (
-    !promotion &&
-    normalizedCode === normalizeCode(env.bookingDiscountCode)
-  ) {
+  if (!promotion && normalizedCode === normalizeCode(env.bookingDiscountCode)) {
     promotion = promotions.find(
-      (candidate) => candidate.enabled && candidate.discountPercent === 50,
+      (candidate) =>
+        candidate.enabled &&
+        candidate.discountPercent === 50 &&
+        candidate.appliesTo === "all",
     );
   }
 
   if (!promotion) {
     throw new Error("That discount code is not valid.");
+  }
+
+  if (!scopeCovers(promotion.appliesTo, service.kind)) {
+    throw new Error(
+      promotion.appliesTo === "equine"
+        ? "That code can only be used for sessions with the horses."
+        : "That code cannot be used for this session.",
+    );
   }
 
   // Free services stay free and do not display a redundant discount.

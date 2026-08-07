@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { Settings } from "lucide-react";
+import { EQUINE_LOCATION } from "@/lib/content";
 
 export function Footer() {
   return (
@@ -15,16 +16,19 @@ export function Footer() {
           <p className="mb-3 font-semibold uppercase tracking-wide text-gold">Explore</p>
           <ul className="space-y-2 text-ivory/70">
             <li><Link href="/#services" className="hover:text-gold">Sessions</Link></li>
+            <li><Link href="/#horses" className="hover:text-gold">The horses</Link></li>
             <li><Link href="/#vision" className="hover:text-gold">The vision</Link></li>
             <li><Link href="/book" className="hover:text-gold">Book a session</Link></li>
+            <li><Link href="/donate" className="hover:text-gold">Support the horses</Link></li>
           </ul>
         </div>
         <div className="text-sm">
           <p className="mb-3 font-semibold uppercase tracking-wide text-gold">Connect</p>
           <ul className="space-y-2 text-ivory/70">
-            {/* Placeholders — swap for real contact details */}
             <li><a href="mailto:sacredhoofandhand@gmail.com" className="hover:text-gold">sacredhoofandhand@gmail.com</a></li>
-            <li><span>Serving virtually &amp; locally</span></li>
+            <li><span>Virtual sessions anywhere</span></li>
+            {/* Street address is private — only sent after a booking. */}
+            <li><span>Horses in {EQUINE_LOCATION.publicLabel}</span></li>
           </ul>
         </div>
         <div className="text-sm">

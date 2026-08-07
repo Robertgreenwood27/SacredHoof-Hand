@@ -30,34 +30,137 @@ create table if not exists public.services (
   price_cents      integer not null,
   location         text not null default 'both'
                      check (location in ('virtual','in-person','both')),
+  -- 'standard' schedules from availability_rules; 'equine' schedules only from
+  -- the dated rows in event_slots.
+  session_kind     text not null default 'standard'
+                     check (session_kind in ('standard','equine')),
   active           boolean not null default true,
   created_at       timestamptz default now()
 );
 
+alter table public.services
+  add column if not exists session_kind text not null default 'standard';
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conname = 'services_session_kind_check'
+      and conrelid = 'public.services'::regclass
+  ) then
+    alter table public.services
+      add constraint services_session_kind_check
+      check (session_kind in ('standard','equine'));
+  end if;
+end
+$$;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- event_slots: explicitly scheduled sessions on specific dates, used by the
+-- equine programme instead of the weekly recurring rules. Each row is exactly
+-- one bookable start time of one fixed length; a 60-minute row is never sold
+-- as two 30-minute sessions, so the gaps between slots stay reserved.
+-- ─────────────────────────────────────────────────────────────────────────
+create table if not exists public.event_slots (
+  id               uuid primary key default gen_random_uuid(),
+  session_kind     text not null default 'equine'
+                     check (session_kind in ('standard','equine')),
+  day              date not null,          -- business-timezone calendar date
+  start_time       text not null,          -- "HH:MM" 24h, business timezone
+  duration_minutes integer not null check (duration_minutes > 0),
+  created_at       timestamptz not null default now(),
+  unique (session_kind, day, start_time, duration_minutes)
+);
+alter table public.event_slots enable row level security;
+
+create index if not exists event_slots_day_idx
+  on public.event_slots (session_kind, day);
+
 -- ─────────────────────────────────────────────────────────────────────────
 -- booking_promotions: server-owned discount codes controlled by the dashboard
 -- ─────────────────────────────────────────────────────────────────────────
+-- The code is the identity: two promotions may share a discount percentage
+-- when they are scoped to different sessions (a site-wide 20% and the
+-- horse-only 20%). Codes are matched case-insensitively in the application.
 create table if not exists public.booking_promotions (
-  discount_percent integer primary key
-                     check (discount_percent in (20, 50, 85)),
-  code              text not null
-                     check (
-                       code = upper(code)
-                       and code ~ '^[A-Z0-9_-]{3,40}$'
-                     ),
+  code              text primary key
+                     check (code ~ '^[A-Za-z0-9#&_-]{3,40}$'),
+  discount_percent  integer not null
+                     check (discount_percent between 1 and 100),
+  applies_to        text not null default 'all'
+                     check (applies_to in ('all','equine')),
   enabled           boolean not null default true,
   updated_at        timestamptz not null default now()
 );
 
+alter table public.booking_promotions
+  add column if not exists applies_to text not null default 'all';
+
+-- Migrate databases created when discount_percent was the primary key and
+-- codes were restricted to uppercase A-Z0-9. Both had to change so the
+-- horse-only "#rescue&reiki" code could exist alongside SACRED20.
+do $$
+begin
+  if exists (
+    select 1
+    from pg_constraint
+    where conname = 'booking_promotions_pkey'
+      and conrelid = 'public.booking_promotions'::regclass
+      and pg_get_constraintdef(oid) = 'PRIMARY KEY (discount_percent)'
+  ) then
+    alter table public.booking_promotions drop constraint booking_promotions_pkey;
+    alter table public.booking_promotions add primary key (code);
+  end if;
+
+  alter table public.booking_promotions
+    drop constraint if exists booking_promotions_code_check;
+  alter table public.booking_promotions
+    drop constraint if exists booking_promotions_discount_percent_check;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'booking_promotions_code_charset_check'
+      and conrelid = 'public.booking_promotions'::regclass
+  ) then
+    alter table public.booking_promotions
+      add constraint booking_promotions_code_charset_check
+      check (code ~ '^[A-Za-z0-9#&_-]{3,40}$');
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'booking_promotions_percent_range_check'
+      and conrelid = 'public.booking_promotions'::regclass
+  ) then
+    alter table public.booking_promotions
+      add constraint booking_promotions_percent_range_check
+      check (discount_percent between 1 and 100);
+  end if;
+
+  if not exists (
+    select 1 from pg_constraint
+    where conname = 'booking_promotions_applies_to_check'
+      and conrelid = 'public.booking_promotions'::regclass
+  ) then
+    alter table public.booking_promotions
+      add constraint booking_promotions_applies_to_check
+      check (applies_to in ('all','equine'));
+  end if;
+end
+$$;
+
 create unique index if not exists booking_promotions_code_uidx
   on public.booking_promotions (lower(code));
 
-insert into public.booking_promotions (discount_percent, code, enabled)
+insert into public.booking_promotions (code, discount_percent, applies_to, enabled)
 values
-  (20, 'SACRED20', true),
-  (50, 'SACRED50', true),
-  (85, 'SACRED85', true)
-on conflict (discount_percent) do nothing;
+  ('SACRED20',      20, 'all',    true),
+  ('SACRED50',      50, 'all',    true),
+  ('SACRED85',      85, 'all',    true),
+  -- Horse programme code. Rejected on virtual/in-person Reiki.
+  ('#rescue&reiki', 20, 'equine', true)
+on conflict (code) do nothing;
 
 alter table public.booking_promotions enable row level security;
 
@@ -403,6 +506,7 @@ alter table public.site_content       enable row level security;
 alter table public.services           enable row level security;
 alter table public.booking_promotions enable row level security;
 alter table public.availability_rules enable row level security;
+alter table public.event_slots        enable row level security;
 alter table public.blocked_days       enable row level security;
 alter table public.booking_agreements enable row level security;
 alter table public.appointments       enable row level security;
@@ -418,6 +522,11 @@ create policy "public read services" on public.services
   for select using (true);
 drop policy if exists "public read availability" on public.availability_rules;
 create policy "public read availability" on public.availability_rules
+  for select using (true);
+-- Herd-day times are public (the booking page renders them); the street
+-- address is not stored here and is never exposed to anonymous readers.
+drop policy if exists "public read event slots" on public.event_slots;
+create policy "public read event slots" on public.event_slots
   for select using (true);
 -- Blocked-day reasons are private. Booking reads them only through the
 -- server-side secret client; remove the former anonymous table policy.
@@ -437,14 +546,90 @@ drop policy if exists "auth read appointments" on public.appointments;
 drop policy if exists "auth update appointments" on public.appointments;
 
 -- ─────────────────────────────────────────────────────────────────────────
--- Seed the starter service catalog (matches src/lib/content.ts)
+-- Service catalog — founding rates (matches src/lib/content.ts)
+--
+-- These rows are upserted, not skipped on conflict, so re-running this file
+-- brings an existing database's prices back in line with the code.
 -- ─────────────────────────────────────────────────────────────────────────
-insert into public.services (id, name, description, duration_minutes, price_cents, location)
+insert into public.services
+  (id, name, description, duration_minutes, price_cents, location, session_kind, active)
 values
-  ('virtual-reiki', 'Virtual Reiki Session',
-   'A distance Reiki session from the comfort of your own space.', 60, 9000, 'virtual'),
-  ('in-person-reiki', 'In-Person Reiki Session',
-   'A hands-on, in-person Reiki session in a calm, grounded setting.', 75, 12000, 'in-person'),
-  ('intro-reiki', 'Intro Mini Session',
-   'A shorter session to experience the practice before a full session.', 30, 5000, 'both')
-on conflict (id) do nothing;
+  ('reiki-30', '30-Minute Reiki',
+   'A focused half-hour of energy work — enough to settle the nervous system, release what you are holding, and come back to center.',
+   30, 3300, 'both', 'standard', true),
+  ('reiki-60', '60-Minute Reiki',
+   'The full session. We begin by setting intentions together, then move into unhurried Reiki with time afterward to land before you go back out into your day.',
+   60, 5500, 'both', 'standard', true),
+  ('reiki-90', '90-Minute Reiki',
+   'A longer, deeper session for when you need more room — space to work slowly through what has been stored, without watching the clock.',
+   90, 11100, 'both', 'standard', true),
+  ('equine-30', '30 Minutes with the Horses',
+   'A half hour of Reiki in the field alongside the herd. Horses regulate the people around them — being near them does part of the work before the session even begins.',
+   30, 7700, 'in-person', 'equine', true),
+  ('equine-60', '60 Minutes with the Horses',
+   'An hour of equine-assisted Reiki. Time to meet the herd, let your body settle into their pace, and receive energy work in their presence.',
+   60, 9900, 'in-person', 'equine', true),
+  ('equine-90', '90 Minutes with the Horses',
+   'The longest session on the land. Unhurried time with the herd — enough that the horses stop reading you as a visitor and the work can go somewhere deeper.',
+   90, 11100, 'in-person', 'equine', true)
+on conflict (id) do update set
+  name             = excluded.name,
+  description      = excluded.description,
+  duration_minutes = excluded.duration_minutes,
+  price_cents      = excluded.price_cents,
+  location         = excluded.location,
+  session_kind     = excluded.session_kind,
+  active           = excluded.active;
+
+-- Retire the pre-founding-rate catalog. These are deactivated rather than
+-- deleted so existing appointments keep resolving their service_id.
+update public.services
+set active = false
+where id in ('virtual-reiki', 'in-person-reiki', 'intro-reiki');
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Herd days. Times are Mountain (BUSINESS_TIMEZONE) wall-clock. A session can
+-- only be booked into a slot of exactly its own length.
+--
+-- The 08:00 and 09:30 starts each offer a 60 OR a 90. Those rows deliberately
+-- overlap: they are alternatives, not extra capacity. Booking either length
+-- removes the other from the calendar (enforced by the appointments overlap
+-- exclusion constraint above, and reflected live in the booking grid). Each 90
+-- ends exactly when the next scheduled session begins — 08:00+90 = 09:30 and
+-- 09:30+90 = 11:00 — so the longer option consumes only the buffer that already
+-- followed it and never pushes the rest of the day back.
+--
+-- To offer a third 90, add ('equine', <day>, '12:00', 90). That one ends at
+-- 13:30 and leaves only a 10-minute turnaround before the 13:40 session.
+-- ─────────────────────────────────────────────────────────────────────────
+insert into public.event_slots (session_kind, day, start_time, duration_minutes)
+values
+  ('equine', date '2026-08-16', '08:00', 60),
+  ('equine', date '2026-08-16', '08:00', 90),
+  ('equine', date '2026-08-16', '09:30', 60),
+  ('equine', date '2026-08-16', '09:30', 90),
+  ('equine', date '2026-08-16', '11:00', 30),
+  ('equine', date '2026-08-16', '12:00', 60),
+  ('equine', date '2026-08-16', '13:40', 60),
+  ('equine', date '2026-08-16', '15:00', 30),
+  ('equine', date '2026-08-23', '08:00', 60),
+  ('equine', date '2026-08-23', '08:00', 90),
+  ('equine', date '2026-08-23', '09:30', 60),
+  ('equine', date '2026-08-23', '09:30', 90),
+  ('equine', date '2026-08-23', '11:00', 30),
+  ('equine', date '2026-08-23', '12:00', 60),
+  ('equine', date '2026-08-23', '13:40', 60),
+  ('equine', date '2026-08-23', '15:00', 30)
+on conflict (session_kind, day, start_time, duration_minutes) do nothing;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Hero copy. Overwritten here so a redeploy of new copy actually reaches the
+-- live site — the dashboard's Hero page still edits this row afterward.
+-- ─────────────────────────────────────────────────────────────────────────
+update public.site_content
+set hero_eyebrow  = 'Reiki · Horses · Sacred Sanctuary',
+    hero_title    = 'Reconnect. Restore. Remember.',
+    hero_subtitle = 'Reiki with Shelby — virtual, in person, and out in the field alongside the horses. A quiet place to set down what you are carrying and remember who you are.',
+    hero_cta_label = 'Book Your Session',
+    updated_at    = now()
+where id = 1;

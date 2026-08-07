@@ -48,10 +48,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const promotion = await applyBookingPromotion(
-      body.code,
-      service.priceCents,
-    );
+    const promotion = await applyBookingPromotion(body.code, service);
     return NextResponse.json({
       valid: promotion.applied,
       code: promotion.code,

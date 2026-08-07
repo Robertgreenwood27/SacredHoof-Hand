@@ -1,7 +1,10 @@
 import { CheckCircle2, CircleOff } from "lucide-react";
 import { SetupNotice } from "@/components/dashboard/SetupNotice";
 import { supabaseAdminConfigured } from "@/lib/env";
-import { getBookingPromotionConfiguration } from "@/lib/promotion";
+import {
+  getBookingPromotionConfiguration,
+  PROMOTION_SCOPE_LABEL,
+} from "@/lib/promotion";
 import { setPromotionEnabled } from "../actions";
 
 export const dynamic = "force-dynamic";
@@ -37,7 +40,7 @@ export default async function PromotionsPage() {
       <div className="space-y-4">
         {configuration.promotions.map((promotion) => (
           <article
-            key={promotion.discountPercent}
+            key={promotion.code}
             className="flex flex-col gap-5 rounded-2xl border border-sage/40 bg-white/70 p-6 sm:flex-row sm:items-center sm:justify-between"
           >
             <div>
@@ -45,6 +48,9 @@ export default async function PromotionsPage() {
                 <h2 className="text-2xl">
                   {promotion.discountPercent}% off
                 </h2>
+                <span className="rounded-full bg-gold/25 px-2.5 py-1 text-xs font-semibold uppercase tracking-wide text-charcoal/70">
+                  {PROMOTION_SCOPE_LABEL[promotion.appliesTo]}
+                </span>
                 <span
                   className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-wide ${
                     promotion.enabled
@@ -71,7 +77,7 @@ export default async function PromotionsPage() {
             <form
               action={setPromotionEnabled.bind(
                 null,
-                promotion.discountPercent,
+                promotion.code,
                 !promotion.enabled,
               )}
             >
@@ -92,7 +98,9 @@ export default async function PromotionsPage() {
 
       <p className="text-sm leading-relaxed text-charcoal/60">
         Codes are not case-sensitive. A disabled code is rejected immediately
-        when a client applies it and is checked again before checkout.
+        when a client applies it and is checked again before checkout. A code
+        marked <em>horse sessions only</em> is refused on virtual and in-person
+        Reiki, both in the booking form and again on the server.
       </p>
     </div>
   );
@@ -103,8 +111,8 @@ function PageHeader() {
     <header>
       <h1 className="text-3xl">Promo codes</h1>
       <p className="mt-1 max-w-2xl text-charcoal/60">
-        Turn the 20%, 50%, and 85% booking discounts on or off. Existing
-        appointment records are not changed.
+        Turn each booking discount on or off. Existing appointment records are
+        not changed.
       </p>
     </header>
   );

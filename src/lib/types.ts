@@ -6,6 +6,14 @@ export type HeroContent = {
   imageUrl: string;
 };
 
+/**
+ * Which programme a session belongs to. `standard` sessions are scheduled from
+ * the weekly availability rules; `equine` sessions are only offered on the
+ * specific event dates in `event_slots` (the horses travel and the herd is only
+ * gathered on those days).
+ */
+export type SessionKind = "standard" | "equine";
+
 export type Service = {
   id: string;
   name: string;
@@ -13,6 +21,7 @@ export type Service = {
   durationMinutes: number;
   priceCents: number;
   location: "virtual" | "in-person" | "both";
+  kind: SessionKind;
   active: boolean;
 };
 
@@ -96,6 +105,20 @@ export type AvailabilityRule = {
   day_of_week: number; // 0 = Sunday ... 6 = Saturday
   start_time: string; // "HH:MM" 24h
   end_time: string; // "HH:MM" 24h
+};
+
+/**
+ * One explicitly scheduled session on a specific date, used by event-based
+ * programmes (the horse days) instead of the weekly recurring rules. Each row
+ * is exactly one bookable start time of one fixed length — a 60-minute row
+ * cannot be booked as two 30-minute sessions.
+ */
+export type EventSlot = {
+  id: string;
+  session_kind: SessionKind;
+  day: string; // "YYYY-MM-DD" in the business timezone
+  start_time: string; // "HH:MM" 24h, business timezone
+  duration_minutes: number;
 };
 
 /** A full day the practitioner has blocked off (no bookings offered). */

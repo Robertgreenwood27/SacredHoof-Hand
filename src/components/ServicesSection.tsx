@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Clock, MapPin } from "lucide-react";
-import { priceLabel } from "@/lib/content";
+import { priceLabel, EQUINE_LOCATION } from "@/lib/content";
 import type { Service } from "@/lib/types";
 
 const locationLabel: Record<Service["location"], string> = {
@@ -10,6 +10,21 @@ const locationLabel: Record<Service["location"], string> = {
 };
 
 export function ServicesSection({ services }: { services: Service[] }) {
+  const groups = [
+    {
+      key: "standard",
+      heading: "Reiki with Shelby",
+      note: "Founding rates · virtual or in person",
+      items: services.filter((s) => s.kind !== "equine"),
+    },
+    {
+      key: "equine",
+      heading: "Reiki with Shelby + horses",
+      note: `Founding rates · ${EQUINE_LOCATION.publicLabel}`,
+      items: services.filter((s) => s.kind === "equine"),
+    },
+  ].filter((group) => group.items.length > 0);
+
   return (
     <section id="services" className="bg-ivory py-24">
       <div className="section">
@@ -22,51 +37,70 @@ export function ServicesSection({ services }: { services: Service[] }) {
           </p>
         </div>
 
-        <div className="mt-14 grid gap-6 md:grid-cols-3">
-          {services.map((service) => {
-            const isFree = service.priceCents === 0;
-            return (
-            <article
-              key={service.id}
-              className={`flex flex-col rounded-3xl p-8 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${
-                isFree
-                  ? "border-2 border-gold bg-gold/10 ring-1 ring-gold/40"
-                  : "border border-sage/40 bg-white/60"
-              }`}
-            >
-              {isFree && (
-                <span className="mb-3 inline-flex w-fit rounded-full bg-gold px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-charcoal">
-                  Limited time · Free
-                </span>
-              )}
-              <h3 className="text-2xl">{service.name}</h3>
-              <p className="mt-3 flex-1 text-sm leading-relaxed text-charcoal/70">
-                {service.description}
-              </p>
-              <dl className="mt-6 space-y-2 text-sm text-charcoal/80">
-                <div className="flex items-center gap-2">
-                  <Clock className="h-4 w-4 text-sage" />
-                  <span>{service.durationMinutes} minutes</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4 text-sage" />
-                  <span>{locationLabel[service.location]}</span>
-                </div>
-              </dl>
-              <div className="mt-6 flex items-center justify-between">
-                <span className="font-heading text-3xl text-terracotta">
-                  {priceLabel(service.priceCents)}
-                </span>
-                <Link
-                  href={`/book?service=${service.id}`}
-                  className={isFree ? "btn-primary" : "btn-secondary"}
-                >
-                  Book
-                </Link>
+        <div className="mt-14 space-y-14">
+          {groups.map((group) => (
+            <div key={group.key}>
+              <div className="mb-6 flex flex-wrap items-baseline gap-x-4 gap-y-1 border-b border-sage/30 pb-3">
+                <h3 className="font-heading text-3xl text-charcoal">
+                  {group.heading}
+                </h3>
+                <p className="text-xs font-semibold uppercase tracking-wide text-charcoal/50">
+                  {group.note}
+                </p>
               </div>
-            </article>
-            );
-          })}
+
+              <div className="grid gap-6 md:grid-cols-3">
+                {group.items.map((service) => {
+                  const isFree = service.priceCents === 0;
+                  return (
+                    <article
+                      key={service.id}
+                      className={`flex flex-col rounded-3xl p-8 shadow-sm transition hover:-translate-y-1 hover:shadow-md ${
+                        isFree
+                          ? "border-2 border-gold bg-gold/10 ring-1 ring-gold/40"
+                          : "border border-sage/40 bg-white/60"
+                      }`}
+                    >
+                      {isFree && (
+                        <span className="mb-3 inline-flex w-fit rounded-full bg-gold px-3 py-1 text-[11px] font-semibold uppercase tracking-wide text-charcoal">
+                          Limited time · Free
+                        </span>
+                      )}
+                      <h4 className="font-heading text-2xl">{service.name}</h4>
+                      <p className="mt-3 flex-1 text-sm leading-relaxed text-charcoal/70">
+                        {service.description}
+                      </p>
+                      <dl className="mt-6 space-y-2 text-sm text-charcoal/80">
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-sage" />
+                          <span>{service.durationMinutes} minutes</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <MapPin className="h-4 w-4 text-sage" />
+                          <span>
+                            {service.kind === "equine"
+                              ? EQUINE_LOCATION.publicLabel
+                              : locationLabel[service.location]}
+                          </span>
+                        </div>
+                      </dl>
+                      <div className="mt-6 flex items-center justify-between">
+                        <span className="font-heading text-3xl text-terracotta">
+                          {priceLabel(service.priceCents)}
+                        </span>
+                        <Link
+                          href={`/book?service=${service.id}`}
+                          className={isFree ? "btn-primary" : "btn-secondary"}
+                        >
+                          Book
+                        </Link>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       </div>
     </section>
