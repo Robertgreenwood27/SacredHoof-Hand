@@ -10,3 +10,8 @@ npm-debug.log*
 .vercel
 next-env.d.ts
 *.tsbuildinfo
+
+# Backups of env files and anything else — .env*.local does NOT match
+# names like ".env.local.bak", which is how a secret nearly got committed.
+*.bak
+.env*.local.*
