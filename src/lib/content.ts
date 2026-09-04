@@ -126,8 +126,12 @@ export function isEquineServiceId(serviceId: string | null | undefined): boolean
  * that length. Add a date here (and in supabase/schema.sql) to open more.
  */
 export const DEFAULT_EVENT_SLOTS: Omit<EventSlot, "id">[] = [
-  "2026-08-16",
-  "2026-08-23",
+  // The dates the practitioner has access to the herd. They are not a weekly
+  // pattern and do not all fall on the same weekday — take them as given.
+  "2026-09-27",
+  "2026-10-25",
+  "2026-11-21",
+  "2026-12-19",
 ].flatMap((day) =>
   (
     [
