@@ -146,15 +146,57 @@ export async function cancelDashboardAppointment(id: string) {
   );
 }
 
+/** "HH:MM" on a 24-hour clock, 00:00–23:59. */
+const WINDOW_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+const minutesOf = (hhmm: string) => {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+};
+
+/**
+ * Normalizes one end of a weekly window. The form uses `<input type="time">`,
+ * which cannot express this app's end-of-day marker "24:00" — so midnight
+ * submitted as an END time is read as end-of-day, the only interpretation that
+ * isn't a zero-length window.
+ */
+function parseWindowTime(raw: string, field: "start" | "end"): string {
+  const value = raw.trim();
+  if (field === "end" && (value === "00:00" || value === "24:00")) {
+    return "24:00";
+  }
+  if (!WINDOW_TIME.test(value)) {
+    throw new Error(`Please enter a valid ${field} time.`);
+  }
+  return value;
+}
+
 export async function addAvailabilityRule(formData: FormData) {
+  const dayOfWeek = Number(formData.get("day_of_week"));
+  if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+    throw new Error("Please choose a day of the week.");
+  }
+  const startTime = parseWindowTime(
+    String(formData.get("start_time") ?? ""),
+    "start",
+  );
+  const endTime = parseWindowTime(String(formData.get("end_time") ?? ""), "end");
+  // A window that ends at or before it starts produces zero slots, which the
+  // booking page can only render as "no open times" — indistinguishable from
+  // being fully booked. Reject it here rather than let it fail silently.
+  if (minutesOf(endTime) <= minutesOf(startTime)) {
+    throw new Error("The end time has to be after the start time.");
+  }
+
   const supabase = await requireAdmin();
   const { error } = await supabase.from("availability_rules").insert({
-    day_of_week: Number(formData.get("day_of_week")),
-    start_time: String(formData.get("start_time")),
-    end_time: String(formData.get("end_time")),
+    day_of_week: dayOfWeek,
+    start_time: startTime,
+    end_time: endTime,
   });
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/availability");
+  revalidatePath("/book");
 }
 
 export async function deleteAvailabilityRule(id: string) {
@@ -162,6 +204,7 @@ export async function deleteAvailabilityRule(id: string) {
   const { error } = await supabase.from("availability_rules").delete().eq("id", id);
   if (error) throw new Error(error.message);
   revalidatePath("/dashboard/availability");
+  revalidatePath("/book");
 }
 
 export async function blockDay(formData: FormData) {

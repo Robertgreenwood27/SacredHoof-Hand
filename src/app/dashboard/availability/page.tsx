@@ -7,6 +7,7 @@ import {
 } from "../actions";
 import { supabaseConfigured } from "@/lib/env";
 import { SetupNotice } from "@/components/dashboard/SetupNotice";
+import { NoAvailabilityNotice } from "@/components/dashboard/NoAvailabilityNotice";
 import { format } from "date-fns";
 import { Trash2 } from "lucide-react";
 
@@ -83,9 +84,7 @@ export default async function AvailabilityPage() {
 
           <div className="space-y-3">
             {rules.length === 0 ? (
-              <p className="rounded-2xl border border-dashed border-sage/50 bg-white/40 p-6 text-sm text-charcoal/50">
-                No availability set yet. Add a window above.
-              </p>
+              <NoAvailabilityNotice />
             ) : (
               rules.map((rule) => (
                 <div

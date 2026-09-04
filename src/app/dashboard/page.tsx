@@ -5,8 +5,10 @@ import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { setAppointmentStatus } from "./actions";
 import { formatPrice, BUSINESS_TIMEZONE } from "@/lib/content";
 import { expirePendingBookingHolds } from "@/lib/booking";
+import { getAvailabilityRules } from "@/lib/data";
 import type { Appointment } from "@/lib/types";
 import { SetupNotice } from "@/components/dashboard/SetupNotice";
+import { NoAvailabilityNotice } from "@/components/dashboard/NoAvailabilityNotice";
 
 export const dynamic = "force-dynamic";
 
@@ -32,10 +34,10 @@ export default async function AppointmentsPage() {
   // This uses the same guarded cleanup as public slot validation.
   await expirePendingBookingHolds();
 
-  const { data } = await supabase
-    .from("appointments")
-    .select("*")
-    .order("starts_at", { ascending: true });
+  const [{ data }, availabilityRules] = await Promise.all([
+    supabase.from("appointments").select("*").order("starts_at", { ascending: true }),
+    getAvailabilityRules(),
+  ]);
 
   const appts = (data ?? []) as Appointment[];
   const now = new Date();
@@ -48,6 +50,8 @@ export default async function AppointmentsPage() {
 
   return (
     <Shell>
+      {availabilityRules.length === 0 && <NoAvailabilityNotice linkToFix />}
+
       <div className="grid gap-4 sm:grid-cols-3">
         <Stat label="Upcoming" value={upcoming.length} />
         <Stat

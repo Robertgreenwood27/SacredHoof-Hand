@@ -623,6 +623,34 @@ values
 on conflict (session_kind, day, start_time, duration_minutes) do nothing;
 
 -- ─────────────────────────────────────────────────────────────────────────
+-- Weekly hours for the STANDARD sessions (virtual + in person). Unlike the
+-- horse days above, these were never seeded — and in production an empty
+-- availability_rules table means the booking page generates no slots at all
+-- and tells every visitor there are no open times. Seed the default hours so
+-- a fresh deploy is bookable out of the box.
+--
+-- These match DEFAULT_AVAILABILITY in src/lib/data.ts: Sun & Mon all day,
+-- Tue–Sat 5pm–midnight. "24:00" is this app's end-of-day marker (the column is
+-- text, not `time`, precisely so midnight-as-an-end can be expressed).
+--
+-- Guarded on the table being EMPTY rather than on conflict, because there is
+-- no natural key here — re-running the file must never duplicate or resurrect
+-- windows the practitioner has since edited from the dashboard.
+-- ─────────────────────────────────────────────────────────────────────────
+insert into public.availability_rules (day_of_week, start_time, end_time)
+select v.day_of_week, v.start_time, v.end_time
+from (values
+  (0, '00:00', '24:00'),
+  (1, '00:00', '24:00'),
+  (2, '17:00', '24:00'),
+  (3, '17:00', '24:00'),
+  (4, '17:00', '24:00'),
+  (5, '17:00', '24:00'),
+  (6, '17:00', '24:00')
+) as v(day_of_week, start_time, end_time)
+where not exists (select 1 from public.availability_rules);
+
+-- ─────────────────────────────────────────────────────────────────────────
 -- Hero copy. Overwritten here so a redeploy of new copy actually reaches the
 -- live site — the dashboard's Hero page still edits this row afterward.
 -- ─────────────────────────────────────────────────────────────────────────
