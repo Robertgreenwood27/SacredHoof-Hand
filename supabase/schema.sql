@@ -604,39 +604,54 @@ where id in ('virtual-reiki', 'in-person-reiki', 'intro-reiki');
 -- ─────────────────────────────────────────────────────────────────────────
 insert into public.event_slots (session_kind, day, start_time, duration_minutes)
 values
-  ('equine', date '2026-09-27', '08:00', 60),
-  ('equine', date '2026-09-27', '08:00', 90),
+  -- Sep 27 is confirmed, but the herd is not available first thing, so the
+  -- two 08:00 starts are deliberately absent. Do not re-add them without word
+  -- from the herd owner.
   ('equine', date '2026-09-27', '09:30', 60),
   ('equine', date '2026-09-27', '09:30', 90),
   ('equine', date '2026-09-27', '11:00', 30),
   ('equine', date '2026-09-27', '12:00', 60),
   ('equine', date '2026-09-27', '13:40', 60),
-  ('equine', date '2026-09-27', '15:00', 30),
-  ('equine', date '2026-10-25', '08:00', 60),
-  ('equine', date '2026-10-25', '08:00', 90),
-  ('equine', date '2026-10-25', '09:30', 60),
-  ('equine', date '2026-10-25', '09:30', 90),
-  ('equine', date '2026-10-25', '11:00', 30),
-  ('equine', date '2026-10-25', '12:00', 60),
-  ('equine', date '2026-10-25', '13:40', 60),
-  ('equine', date '2026-10-25', '15:00', 30),
-  ('equine', date '2026-11-21', '08:00', 60),
-  ('equine', date '2026-11-21', '08:00', 90),
-  ('equine', date '2026-11-21', '09:30', 60),
-  ('equine', date '2026-11-21', '09:30', 90),
-  ('equine', date '2026-11-21', '11:00', 30),
-  ('equine', date '2026-11-21', '12:00', 60),
-  ('equine', date '2026-11-21', '13:40', 60),
-  ('equine', date '2026-11-21', '15:00', 30),
-  ('equine', date '2026-12-19', '08:00', 60),
-  ('equine', date '2026-12-19', '08:00', 90),
-  ('equine', date '2026-12-19', '09:30', 60),
-  ('equine', date '2026-12-19', '09:30', 90),
-  ('equine', date '2026-12-19', '11:00', 30),
-  ('equine', date '2026-12-19', '12:00', 60),
-  ('equine', date '2026-12-19', '13:40', 60),
-  ('equine', date '2026-12-19', '15:00', 30)
+  ('equine', date '2026-09-27', '15:00', 30)
 on conflict (session_kind, day, start_time, duration_minutes) do nothing;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- PENCILED IN, NOT CONFIRMED — Oct 25, Nov 21, Dec 19.
+--
+-- Anything in event_slots is publicly bookable the moment it lands, and
+-- production reads this table rather than DEFAULT_EVENT_SLOTS, so an
+-- unconfirmed date left here sells sessions the practitioner may not be able
+-- to hold. Taking a booking back is far worse than opening a date late.
+--
+-- TO CONFIRM A DATE: uncomment its six lines below, uncomment the matching
+-- entry in HERD_DAYS in src/lib/content.ts, and run this file (or just the
+-- statement below) against Supabase. It is guarded by ON CONFLICT DO NOTHING,
+-- so re-running is safe. No deploy is needed for the dates to go live.
+--
+-- The 08:00 starts are omitted here too — carry them over only if the herd is
+-- available that early on the date being confirmed.
+-- ─────────────────────────────────────────────────────────────────────────
+-- insert into public.event_slots (session_kind, day, start_time, duration_minutes)
+-- values
+--   ('equine', date '2026-10-25', '09:30', 60),
+--   ('equine', date '2026-10-25', '09:30', 90),
+--   ('equine', date '2026-10-25', '11:00', 30),
+--   ('equine', date '2026-10-25', '12:00', 60),
+--   ('equine', date '2026-10-25', '13:40', 60),
+--   ('equine', date '2026-10-25', '15:00', 30),
+--   ('equine', date '2026-11-21', '09:30', 60),
+--   ('equine', date '2026-11-21', '09:30', 90),
+--   ('equine', date '2026-11-21', '11:00', 30),
+--   ('equine', date '2026-11-21', '12:00', 60),
+--   ('equine', date '2026-11-21', '13:40', 60),
+--   ('equine', date '2026-11-21', '15:00', 30),
+--   ('equine', date '2026-12-19', '09:30', 60),
+--   ('equine', date '2026-12-19', '09:30', 90),
+--   ('equine', date '2026-12-19', '11:00', 30),
+--   ('equine', date '2026-12-19', '12:00', 60),
+--   ('equine', date '2026-12-19', '13:40', 60),
+--   ('equine', date '2026-12-19', '15:00', 30)
+-- on conflict (session_kind, day, start_time, duration_minutes) do nothing;
 
 -- ─────────────────────────────────────────────────────────────────────────
 -- Weekly hours for the STANDARD sessions (virtual + in person). Unlike the

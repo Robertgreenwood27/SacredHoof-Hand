@@ -120,41 +120,59 @@ export function isEquineServiceId(serviceId: string | null | undefined): boolean
 }
 
 /**
- * The horse days. Equine sessions are NOT offered on the weekly schedule —
- * each row below is one specific bookable start time on one specific date, in
- * the business timezone, and a slot can only be booked by a service of exactly
- * that length. Add a date here (and in supabase/schema.sql) to open more.
+ * The full slate of starts on a herd day, in the business timezone.
+ *
+ * The 60 and the 90 at each of the first two starts are ALTERNATIVES, not extra
+ * capacity: they overlap, so booking either one removes the other from the
+ * calendar. Each 90 uses only the buffer that already followed its 60 (08:00
+ * ends at 09:30, 09:30 ends at 11:00), so choosing the longer session never
+ * moves anything later in the day.
  */
-export const DEFAULT_EVENT_SLOTS: Omit<EventSlot, "id">[] = [
-  // The dates the practitioner has access to the herd. They are not a weekly
-  // pattern and do not all fall on the same weekday — take them as given.
-  "2026-09-27",
-  "2026-10-25",
-  "2026-11-21",
-  "2026-12-19",
-].flatMap((day) =>
-  (
-    [
-      // The 60 and the 90 at each of these two starts are ALTERNATIVES, not
-      // extra capacity: they overlap, so booking either one removes the other
-      // from the calendar. Each 90 uses only the buffer that already followed
-      // its 60 (08:00 ends at 09:30, 09:30 ends at 11:00), so choosing the
-      // longer session never moves anything later in the day.
-      ["08:00", 60],
-      ["08:00", 90],
-      ["09:30", 60],
-      ["09:30", 90],
-      ["11:00", 30],
-      ["12:00", 60],
-      ["13:40", 60],
-      ["15:00", 30],
-    ] as const
-  ).map(([start_time, duration_minutes]) => ({
-    session_kind: "equine" as SessionKind,
-    day,
-    start_time,
-    duration_minutes,
-  })),
+const HERD_DAY_STARTS = [
+  ["08:00", 60],
+  ["08:00", 90],
+  ["09:30", 60],
+  ["09:30", 90],
+  ["11:00", 30],
+  ["12:00", 60],
+  ["13:40", 60],
+  ["15:00", 30],
+] as const;
+
+/**
+ * The horse days. Equine sessions are NOT offered on the weekly schedule — each
+ * one is a specific start time on a specific date, and a slot can only be
+ * booked by a service of exactly that length.
+ *
+ * Only CONFIRMED dates belong here. A date the practitioner has not locked in
+ * with the herd owner stays commented out below: anything listed is publicly
+ * bookable, and taking a booking back is far worse than opening a date late.
+ * Confirming one is uncommenting a line here and running the matching insert in
+ * supabase/schema.sql — production reads that table, never this list.
+ *
+ * `notBefore` trims a day the practitioner only has the herd for part of.
+ */
+const HERD_DAYS: { day: string; notBefore?: string }[] = [
+  // Confirmed, but the herd is not available first thing — 08:00 starts are out.
+  { day: "2026-09-27", notBefore: "09:00" },
+
+  // Penciled in, NOT yet confirmed. Uncomment as each is agreed:
+  // { day: "2026-10-25" },
+  // { day: "2026-11-21" },
+  // { day: "2026-12-19" },
+];
+
+export const DEFAULT_EVENT_SLOTS: Omit<EventSlot, "id">[] = HERD_DAYS.flatMap(
+  ({ day, notBefore }) =>
+    HERD_DAY_STARTS
+      // Zero-padded "HH:MM" compares correctly as a string.
+      .filter(([start_time]) => !notBefore || start_time >= notBefore)
+      .map(([start_time, duration_minutes]) => ({
+        session_kind: "equine" as SessionKind,
+        day,
+        start_time,
+        duration_minutes,
+      })),
 );
 
 /**
