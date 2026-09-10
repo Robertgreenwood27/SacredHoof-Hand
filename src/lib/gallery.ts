@@ -67,13 +67,8 @@ export const GALLERY_ITEMS: GalleryItem[] = [
     caption: "An afternoon with the herd in Fairplay.",
   },
 
-  // Once the session video is up on YouTube, uncomment this and paste the id:
-  // {
-  //   type: "video",
-  //   youtubeId: "REPLACE_WITH_YOUTUBE_ID",
-  //   title: "A session with the horses",
-  //   caption: "A few minutes in the pasture, start to finish.",
-  // },
+  // The 30-second film is not here — it is self-hosted and has its own band
+  // above the gallery (src/lib/film.ts). This list is for extra clips.
 ];
 
 /**

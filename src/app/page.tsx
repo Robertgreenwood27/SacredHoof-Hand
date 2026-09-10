@@ -2,7 +2,9 @@ import { Navbar } from "@/components/Navbar";
 import { Hero } from "@/components/Hero";
 import { ServicesSection } from "@/components/ServicesSection";
 import { EquineProgramSection } from "@/components/EquineProgramSection";
+import { FilmSection } from "@/components/FilmSection";
 import { GallerySection } from "@/components/GallerySection";
+import { TestimonialsSection } from "@/components/TestimonialsSection";
 import { VisionSection } from "@/components/VisionSection";
 import { FreeSessionBanner } from "@/components/FreeSessionBanner";
 import { Footer } from "@/components/Footer";
@@ -34,7 +36,9 @@ export default async function HomePage() {
       {freeActive && <FreeSessionBanner />}
       <ServicesSection services={services} />
       <EquineProgramSection />
+      <FilmSection />
       <GallerySection />
+      <TestimonialsSection />
       <VisionSection />
 
       {/* Closing CTA */}
