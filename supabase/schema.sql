@@ -604,19 +604,26 @@ where id in ('virtual-reiki', 'in-person-reiki', 'intro-reiki');
 -- ─────────────────────────────────────────────────────────────────────────
 insert into public.event_slots (session_kind, day, start_time, duration_minutes)
 values
-  -- Sep 27 is confirmed, but the herd is not available first thing, so the
-  -- two 08:00 starts are deliberately absent. Do not re-add them without word
-  -- from the herd owner.
-  ('equine', date '2026-09-27', '09:30', 60),
-  ('equine', date '2026-09-27', '09:30', 90),
-  ('equine', date '2026-09-27', '11:00', 30),
-  ('equine', date '2026-09-27', '12:00', 60),
-  ('equine', date '2026-09-27', '13:40', 60),
-  ('equine', date '2026-09-27', '15:00', 30)
+  -- Oct 25 is confirmed. The two 08:00 starts are deliberately absent; do not
+  -- add them without word from the herd owner that the herd is available.
+  ('equine', date '2026-10-25', '09:30', 60),
+  ('equine', date '2026-10-25', '09:30', 90),
+  ('equine', date '2026-10-25', '11:00', 30),
+  ('equine', date '2026-10-25', '12:00', 60),
+  ('equine', date '2026-10-25', '13:40', 60),
+  ('equine', date '2026-10-25', '15:00', 30)
 on conflict (session_kind, day, start_time, duration_minutes) do nothing;
 
+-- Sep 27 is cancelled: no horse sessions and no standard Reiki that day.
+-- Removing its slots stops them being sold; blocking the day also removes the
+-- regular Sunday hours. Neither touches bookings already made for that date.
+delete from public.event_slots where day = date '2026-09-27';
+insert into public.blocked_days (day, reason)
+values (date '2026-09-27', 'No Reiki this day')
+on conflict (day) do nothing;
+
 -- ─────────────────────────────────────────────────────────────────────────
--- PENCILED IN, NOT CONFIRMED — Oct 25, Nov 21, Dec 19.
+-- PENCILED IN, NOT CONFIRMED — Nov 21, Dec 19.
 --
 -- Anything in event_slots is publicly bookable the moment it lands, and
 -- production reads this table rather than DEFAULT_EVENT_SLOTS, so an
@@ -633,12 +640,6 @@ on conflict (session_kind, day, start_time, duration_minutes) do nothing;
 -- ─────────────────────────────────────────────────────────────────────────
 -- insert into public.event_slots (session_kind, day, start_time, duration_minutes)
 -- values
---   ('equine', date '2026-10-25', '09:30', 60),
---   ('equine', date '2026-10-25', '09:30', 90),
---   ('equine', date '2026-10-25', '11:00', 30),
---   ('equine', date '2026-10-25', '12:00', 60),
---   ('equine', date '2026-10-25', '13:40', 60),
---   ('equine', date '2026-10-25', '15:00', 30),
 --   ('equine', date '2026-11-21', '09:30', 60),
 --   ('equine', date '2026-11-21', '09:30', 90),
 --   ('equine', date '2026-11-21', '11:00', 30),
