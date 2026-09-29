@@ -602,17 +602,13 @@ where id in ('virtual-reiki', 'in-person-reiki', 'intro-reiki');
 -- To offer a third 90, add ('equine', <day>, '12:00', 90). That one ends at
 -- 13:30 and leaves only a 10-minute turnaround before the 13:40 session.
 -- ─────────────────────────────────────────────────────────────────────────
-insert into public.event_slots (session_kind, day, start_time, duration_minutes)
-values
-  -- Oct 25 is confirmed. The two 08:00 starts are deliberately absent; do not
-  -- add them without word from the herd owner that the herd is available.
-  ('equine', date '2026-10-25', '09:30', 60),
-  ('equine', date '2026-10-25', '09:30', 90),
-  ('equine', date '2026-10-25', '11:00', 30),
-  ('equine', date '2026-10-25', '12:00', 60),
-  ('equine', date '2026-10-25', '13:40', 60),
-  ('equine', date '2026-10-25', '15:00', 30)
-on conflict (session_kind, day, start_time, duration_minutes) do nothing;
+-- No herd days are currently confirmed. Add a confirmed date's slots here,
+-- following the commented template further down.
+--
+-- Oct 25 was confirmed and then called off; its slots are removed. The day
+-- itself stays open for the regular (non-horse) Reiki hours.
+delete from public.event_slots
+where session_kind = 'equine' and day = date '2026-10-25';
 
 -- Sep 27 is cancelled: no horse sessions and no standard Reiki that day.
 -- Removing its slots stops them being sold; blocking the day also removes the

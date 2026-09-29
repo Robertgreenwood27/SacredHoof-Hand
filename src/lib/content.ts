@@ -153,10 +153,6 @@ const HERD_DAY_STARTS = [
  * `notBefore` trims a day the practitioner only has the herd for part of.
  */
 const HERD_DAYS: { day: string; notBefore?: string }[] = [
-  // Confirmed. 08:00 starts are left out, matching supabase/schema.sql — add
-  // them back only on word that the herd is available that early.
-  { day: "2026-10-25", notBefore: "09:00" },
-
   // Penciled in, NOT yet confirmed. Uncomment as each is agreed:
   // { day: "2026-11-21" },
   // { day: "2026-12-19" },
