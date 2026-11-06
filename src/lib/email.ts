@@ -7,6 +7,7 @@ import {
   BUSINESS_TIMEZONE,
   EQUINE_LOCATION,
   isEquineServiceId,
+  isFreeSessionActive,
 } from "./content";
 import { isValidEmail } from "./validation";
 import type { Appointment } from "./types";
@@ -179,6 +180,38 @@ function manageBookingLink(appt: AppointmentEmailInput): string {
   `;
 }
 
+/** Replies go directly to Shelby through the existing Reply-To header. */
+function clientContactBlock(): string {
+  return `<p>Questions, running late, or need help before your session? Reply to this email to reach Shelby directly, or <a href="mailto:${escapeHtml(env.practitionerEmail)}" style="color:#C98C73;">email Shelby</a>.</p>`;
+}
+
+export function buildFollowUpEmail(appt: AppointmentEmailInput): string {
+  const bookingUrl = new URL("/book?service=free-intro", env.siteUrl).toString();
+  return wrap(`
+    <p>Hi ${escapeHtml(appt.client_name)},</p>
+    <p>Just checking in after our session. How have you been feeling these past couple of days?</p>
+    <p>If you have any questions or would like to share how things are going, reply to this email. I'd love to hear from you.</p>
+    ${isFreeSessionActive() ? `<p>You're welcome to come back for a complimentary 20-minute Reiki session whenever it feels right.</p>
+    <p><a href="${escapeHtml(bookingUrl)}" style="display:inline-block; border-radius:999px; background:#C98C73; padding:11px 20px; color:#fff; font-weight:600; text-decoration:none;">Book a complimentary session</a></p>` : ""}
+    <p>With warmth,<br/>Shelby<br/>Sacred Hoof &amp; Hand</p>
+  `);
+}
+
+/** A single client check-in; never sends a practitioner copy. */
+export async function sendFollowUpEmail(appt: AppointmentEmailInput): Promise<EmailDeliveryResult> {
+  return sendRenderedEmails(appt, {
+    subjectClient: "Checking in after your session — Sacred Hoof & Hand",
+    clientHtml: buildFollowUpEmail(appt),
+    subjectPractitioner: "",
+    practitionerHtml: "",
+  }, "two-day follow-up", {
+    recipients: { client: true, practitioner: false },
+    idempotencyPrefix: appt.appointment_id
+      ? `followup:${appt.appointment_id}:${appt.ends_at}`
+      : undefined,
+  });
+}
+
 /** Builds the rendered subjects + HTML for both emails (no sending). */
 export function buildBookingEmails(
   appt: AppointmentEmailInput,
@@ -209,6 +242,7 @@ export function buildBookingEmails(
     </table>
     ${equineLocationBlock(appt)}
     ${manageBookingLink(appt)}
+    ${clientContactBlock()}
     <p>Take a few moments before our time together to settle in and set an intention. I look forward to holding space for you.</p>
 
     <div style="margin:24px 0; padding:20px 22px; background:#F7F3EC; border-left:3px solid #D6B56D; border-radius:8px;">
@@ -253,6 +287,7 @@ function buildAppointmentChangedEmails(
     </table>
     ${equineLocationBlock(appt)}
     ${manageBookingLink(appt)}
+    ${clientContactBlock()}
     <p>If this new time does not work for you, please manage your booking or reply to this email.</p>
     <p>With warmth,<br/>Sacred Hoof &amp; Hand</p>
   `);
@@ -305,7 +340,7 @@ function buildAppointmentCancelledEmails(
   return { subjectClient, subjectPractitioner, clientHtml, practitionerHtml };
 }
 
-function buildReminderEmails(
+export function buildReminderEmails(
   appt: AppointmentEmailInput,
 ): RenderedAppointmentEmails {
   const whenClient = when(appt, clientTimeZone(appt));
@@ -322,6 +357,7 @@ function buildReminderEmails(
     </table>
     ${equineLocationBlock(appt)}
     ${manageBookingLink(appt)}
+    ${clientContactBlock()}
     <p>Take a few moments beforehand to settle in and set an intention. I look forward to our time together.</p>
     <p>With warmth,<br/>Sacred Hoof &amp; Hand</p>
   `);
@@ -483,7 +519,7 @@ export async function sendAppointmentCancelledEmails(
   );
 }
 
-/** Sends a day-before reminder to the client, practitioner, or both. */
+/** Sends a same-day reminder to the client, practitioner, or both. */
 export async function sendReminderEmails(
   appt: AppointmentEmailInput,
   recipients: EmailRecipients = {},

@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { subMinutes } from "date-fns";
-import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { notificationWindows } from "@/lib/notification-windows";
 import { createSupabaseAdminClient } from "@/lib/supabase/server";
 import { env, emailConfigured } from "@/lib/env";
 import { BUSINESS_TIMEZONE } from "@/lib/content";
 import {
   sendReminderEmails,
+  sendFollowUpEmail,
   type EmailRecipients,
 } from "@/lib/email";
 import { expirePendingBookingHolds } from "@/lib/booking";
@@ -15,10 +16,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 type AdminClient = NonNullable<ReturnType<typeof createSupabaseAdminClient>>;
-type Recipient = "client" | "practitioner";
+type Recipient = "client" | "practitioner" | "followup";
 
 const REMINDER_LEASE_MINUTES = 15;
 const recipientColumns = {
+  followup: { claimed: "followup_claimed_at", sent: "followup_sent_at" },
   client: {
     claimed: "client_reminder_claimed_at",
     sent: "client_reminder_sent_at",
@@ -28,13 +30,6 @@ const recipientColumns = {
     sent: "practitioner_reminder_sent_at",
   },
 } as const;
-
-function addCalendarDays(dateKey: string, days: number): string {
-  const [year, month, day] = dateKey.split("-").map(Number);
-  return new Date(Date.UTC(year, month - 1, day + days))
-    .toISOString()
-    .slice(0, 10);
-}
 
 function authorized(request: Request): boolean {
   if (!env.cronSecret) return process.env.NODE_ENV !== "production";
@@ -82,8 +77,9 @@ async function claimRecipient(
     .from("appointments")
     .update({ [claimColumn]: claimAt })
     .eq("id", appointment.id)
-    .eq("status", "confirmed")
+    .in("status", recipient === "followup" ? ["confirmed", "completed"] : ["confirmed"])
     .eq("starts_at", appointment.starts_at)
+    .eq("ends_at", appointment.ends_at)
     .is(sentColumn, null)
     .or(`${claimColumn}.is.null,${claimColumn}.lt.${staleBefore}`)
     .select("id")
@@ -98,14 +94,15 @@ async function claimRecipient(
   // claim. A later reschedule uses a different provider idempotency key.
   const { data: current, error: currentError } = await supabase
     .from("appointments")
-    .select("status, starts_at")
+    .select("status, starts_at, ends_at")
     .eq("id", appointment.id)
     .maybeSingle();
   if (
     currentError ||
     !current ||
-    current.status !== "confirmed" ||
-    current.starts_at !== appointment.starts_at
+    !(recipient === "followup" ? ["confirmed", "completed"] : ["confirmed"]).includes(current.status) ||
+    current.starts_at !== appointment.starts_at ||
+    current.ends_at !== appointment.ends_at
   ) {
     await releaseClaim(supabase, appointment.id, recipient, claimAt);
     if (currentError) {
@@ -131,8 +128,7 @@ async function sendToRecipient(
     client: recipient === "client",
     practitioner: recipient === "practitioner",
   };
-  const delivery = await sendReminderEmails(
-    {
+  const input = {
       appointment_id: appointment.id,
       client_name: appointment.client_name,
       client_email: appointment.client_email,
@@ -143,11 +139,12 @@ async function sendToRecipient(
       amount_cents: appointment.amount_cents,
       notes: appointment.notes,
       client_timezone: appointment.client_timezone,
-    },
-    recipients,
-  );
+    };
+  const delivery = recipient === "followup"
+    ? await sendFollowUpEmail(input)
+    : await sendReminderEmails(input, recipients);
   const delivered =
-    recipient === "client"
+    recipient !== "practitioner"
       ? delivery.clientSent
       : delivery.practitionerSent;
 
@@ -166,15 +163,16 @@ async function sendToRecipient(
       [claimColumn]: null,
     })
     .eq("id", appointment.id)
-    .eq("status", "confirmed")
+    .in("status", recipient === "followup" ? ["confirmed", "completed"] : ["confirmed"])
     .eq("starts_at", appointment.starts_at)
+    .eq("ends_at", appointment.ends_at)
     .eq(claimColumn, claimAt)
     .is(sentColumn, null)
     .select("id")
     .maybeSingle();
   if (error || !data) {
     // Resend receives a stable idempotency key, so a later retry will not send
-    // this same appointment/start/recipient twice even if persistence failed.
+    // this same appointment/recipient twice within the provider's 24-hour window.
     throw new Error(
       `Could not record ${recipient} reminder delivery: ${
         error?.message ?? "appointment changed during delivery"
@@ -222,7 +220,7 @@ async function completeReminder(
 
 /**
  * Runs once each morning and includes every unsent confirmed appointment on
- * tomorrow's calendar date in the practitioner's timezone. Per-recipient
+ * today's calendar date in the practitioner's timezone. Per-recipient
  * leases plus Resend idempotency keys make retries safe and allow partial
  * delivery recovery.
  */
@@ -248,21 +246,10 @@ export async function GET(request: Request) {
   await expirePendingBookingHolds();
 
   const now = new Date();
-  const today = formatInTimeZone(
-    now,
-    BUSINESS_TIMEZONE,
-    "yyyy-MM-dd",
-  );
-  const reminderDay = addCalendarDays(today, 1);
-  const dayAfterReminder = addCalendarDays(today, 2);
-  const from = fromZonedTime(
-    `${reminderDay}T00:00:00`,
-    BUSINESS_TIMEZONE,
-  ).toISOString();
-  const to = fromZonedTime(
-    `${dayAfterReminder}T00:00:00`,
-    BUSINESS_TIMEZONE,
-  ).toISOString();
+  const windows = notificationWindows(now);
+  const reminderDay = windows.businessDate;
+  const from = windows.reminderFrom;
+  const to = windows.reminderTo;
   const { data, error } = await supabase
     .from("appointments")
     .select("*")
@@ -319,9 +306,36 @@ export async function GET(request: Request) {
     }
   }
 
+  // Restrict to the second calendar day after a session; never email old history.
+  const { data: followups, error: followupError } = await supabase
+    .from("appointments")
+    .select("*")
+    .in("status", ["confirmed", "completed"])
+    .gte("ends_at", windows.followUpFrom)
+    .lt("ends_at", windows.followUpTo)
+    .is("followup_sent_at", null)
+    .order("ends_at", { ascending: true })
+    .limit(100);
+  if (followupError) {
+    console.error("[reminders] could not load follow-ups", followupError);
+    return NextResponse.json({ error: "Could not load follow-ups." }, { status: 500 });
+  }
+  let followupsSent = 0;
+  for (const appointment of (followups ?? []) as Appointment[]) {
+    try {
+      const result = await sendToRecipient(supabase, appointment, "followup");
+      if (result === "sent") followupsSent += 1;
+      if (result === "failed") failures.push(`${appointment.id}:followup`);
+    } catch (error) {
+      console.error("[reminders] follow-up failed", error);
+      failures.push(`${appointment.id}:followup`);
+    }
+  }
+
   return NextResponse.json({
     checked: data?.length ?? 0,
     recipientDeliveries,
+    followupsSent,
     completed,
     failures,
     window: {

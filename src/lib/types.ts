@@ -53,6 +53,8 @@ export type Appointment = {
   hold_expires_at: string | null;
   updated_at: string;
   rescheduled_at: string | null;
+  followup_sent_at: string | null;
+  followup_claimed_at: string | null;
   reminder_sent_at: string | null;
   client_reminder_sent_at: string | null;
   practitioner_reminder_sent_at: string | null;
