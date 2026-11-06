@@ -571,7 +571,13 @@ values
    60, 9900, 'in-person', 'equine', true),
   ('equine-90', '90 Minutes with the Horses',
    'The longest session on the land. Unhurried time with the herd — enough that the horses stop reading you as a visitor and the work can go somewhere deeper.',
-   90, 11100, 'in-person', 'equine', true)
+   90, 11100, 'in-person', 'equine', true),
+  ('reiki-couples', 'Couples Reiki',
+   'A shared Reiki session for two, with space to slow down, set intentions together, and reconnect. The price includes both partners.',
+   60, 13100, 'both', 'standard', true),
+  ('equine-couples', 'Couples with the Horses',
+   'A shared Reiki session for two alongside the herd, with time to settle into the surroundings and reconnect together. The price includes both partners.',
+   60, 20200, 'in-person', 'equine', true)
 on conflict (id) do update set
   name             = excluded.name,
   description      = excluded.description,
