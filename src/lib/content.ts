@@ -76,6 +76,17 @@ export const DEFAULT_SERVICES: Service[] = [
     active: true,
   },
   {
+    id: "reiki-couples",
+    name: "Couples Reiki",
+    description:
+      "A shared Reiki session for two, with space to slow down, set intentions together, and reconnect. The price includes both partners.",
+    durationMinutes: 60,
+    priceCents: 13100,
+    location: "both",
+    kind: "standard",
+    active: true,
+  },
+  {
     id: "equine-30",
     name: "30 Minutes with the Horses",
     description:
@@ -104,6 +115,17 @@ export const DEFAULT_SERVICES: Service[] = [
       "The longest session on the land. Unhurried time with the herd — enough that the horses stop reading you as a visitor and the work can go somewhere deeper.",
     durationMinutes: 90,
     priceCents: 11100,
+    location: "in-person",
+    kind: "equine",
+    active: true,
+  },
+  {
+    id: "equine-couples",
+    name: "Couples with the Horses",
+    description:
+      "A shared Reiki session for two alongside the herd, with time to settle into the surroundings and reconnect together. The price includes both partners.",
+    durationMinutes: 60,
+    priceCents: 20200,
     location: "in-person",
     kind: "equine",
     active: true,
